@@ -7,11 +7,11 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "2e0e17c545abe579beaecd9571bd6cce31e7d3f2"
+			"Rev": "c9955a2cde550da8894e05ec34c3e5c3361b7b50"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "2e0e17c545abe579beaecd9571bd6cce31e7d3f2"
+			"Rev": "c9955a2cde550da8894e05ec34c3e5c3361b7b50"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -20,11 +20,11 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "93aaeec320a837a8d6b47ecbb4b4eab957a3e1de"
+			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/timeprovider",
-			"Rev": "93aaeec320a837a8d6b47ecbb4b4eab957a3e1de"
+			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/storeadapter",
