@@ -72,7 +72,7 @@ func initializeLogger() *steno.Logger {
 
 	steno.Init(stenoConfig)
 
-	return steno.NewLogger("Stager")
+	return steno.NewLogger("AppManager")
 }
 
 func initializeNatsClient(logger *steno.Logger) yagnats.NATSClient {
