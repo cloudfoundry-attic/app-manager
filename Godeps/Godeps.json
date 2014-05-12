@@ -32,7 +32,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "8bf15e48f3abf6db1765ff908ee678a6f347ce0a"
+			"Rev": "2c197cfdcd587274614ab63fef96bbaaa1c01f10"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
