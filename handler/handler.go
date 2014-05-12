@@ -47,7 +47,7 @@ func (h Handler) Start() {
 				{
 					Action: models.DownloadAction{
 						From:     desireAppMessage.DropletUri,
-						To:       "/app",
+						To:       "/",
 						Extract:  true,
 						CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
 					},

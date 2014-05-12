@@ -83,7 +83,7 @@ var _ = Describe("Main", func() {
 								{
 									Action: models.DownloadAction{
 										From:     "http://the-droplet.uri.com",
-										To:       "/app",
+										To:       "/",
 										Extract:  true,
 										CacheKey: "droplets-the-app-guid-the-app-version",
 									},
