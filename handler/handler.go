@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
@@ -47,14 +48,14 @@ func (h Handler) Start() {
 				{
 					Action: models.DownloadAction{
 						From:     desireAppMessage.DropletUri,
-						To:       "/",
+						To:       ".",
 						Extract:  true,
 						CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
 					},
 				},
 				{
 					Action: models.RunAction{
-						Script:  fmt.Sprintf("cd /app && %s", desireAppMessage.StartCommand),
+						Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
 						Env:     nil,
 						Timeout: 0,
 					},

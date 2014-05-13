@@ -67,14 +67,14 @@ var _ = Describe("Inbox", func() {
 					{
 						Action: models.DownloadAction{
 							From:     "http://the-droplet.uri.com",
-							To:       "/",
+							To:       ".",
 							Extract:  true,
 							CacheKey: "droplets-the-app-guid-the-app-version",
 						},
 					},
 					{
 						Action: models.RunAction{
-							Script: "cd /app && the-start-command",
+							Script: "cd ./app && the-start-command",
 						},
 					},
 				}))

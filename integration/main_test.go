@@ -2,11 +2,12 @@ package integration_test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	"github.com/cloudfoundry/gunk/natsrunner"
 	"github.com/cloudfoundry/gunk/timeprovider"
 	"github.com/cloudfoundry/yagnats"
-	"testing"
 
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry/storeadapter/storerunner/etcdstorerunner"
@@ -83,14 +84,14 @@ var _ = Describe("Main", func() {
 								{
 									Action: models.DownloadAction{
 										From:     "http://the-droplet.uri.com",
-										To:       "/",
+										To:       ".",
 										Extract:  true,
 										CacheKey: "droplets-the-app-guid-the-app-version",
 									},
 								},
 								{
 									Action: models.RunAction{
-										Script: "cd /app && the-start-command",
+										Script: "cd ./app && the-start-command",
 									},
 								},
 							},
