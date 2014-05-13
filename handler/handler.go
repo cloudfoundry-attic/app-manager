@@ -106,8 +106,7 @@ func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int
 	if err != nil {
 		return env, err
 	}
-	env = append(env[:vcapAppEnvIndex], env[vcapAppEnvIndex+1:]...)
-	env = append(env, models.EnvironmentVariable{Key: "VCAP_APPLICATION", Value: string(lrpEnv)})
 
+	env[vcapAppEnvIndex] = models.EnvironmentVariable{Key: "VCAP_APPLICATION", Value: string(lrpEnv)}
 	return env, nil
 }
