@@ -61,12 +61,11 @@ func (h Handler) Start() {
 				{
 					Action: models.RunAction{
 						Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
-						Env:     nil,
+						Env:     lrpEnv,
 						Timeout: 0,
 					},
 				},
 			},
-			Environment: lrpEnv,
 		})
 
 		if err != nil {

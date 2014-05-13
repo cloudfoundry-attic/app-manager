@@ -68,49 +68,47 @@ var _ = Describe("Inbox", func() {
 					Index:      &zero,
 				}))
 
-				Ω(lrp.Actions).Should(Equal([]models.ExecutorAction{
-					{
-						Action: models.DownloadAction{
-							From:     "http://the-droplet.uri.com",
-							To:       ".",
-							Extract:  true,
-							CacheKey: "droplets-the-app-guid-the-app-version",
-						},
-					},
-					{
-						Action: models.RunAction{
-							Script: "cd ./app && the-start-command",
-						},
-					},
+				Ω(lrp.Actions).Should(HaveLen(2))
+
+				Ω(lrp.Actions[0].Action).Should(Equal(models.DownloadAction{
+					From:     "http://the-droplet.uri.com",
+					To:       ".",
+					Extract:  true,
+					CacheKey: "droplets-the-app-guid-the-app-version",
 				}))
 
-				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+				runAction, ok := lrp.Actions[1].Action.(models.RunAction)
+				Ω(ok).Should(BeTrue())
+
+				Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
+
+				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "foo",
 					Value: "bar",
 				}))
 
-				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "PORT",
 					Value: "8080",
 				}))
 
-				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "VCAP_APP_PORT",
 					Value: "8080",
 				}))
 
-				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "VCAP_APP_HOST",
 					Value: "0.0.0.0",
 				}))
 
-				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "TMPDIR",
 					Value: "$HOME/tmp",
 				}))
 
 				var vcapAppEnv string
-				for _, envVar := range lrp.Environment {
+				for _, envVar := range runAction.Env {
 					if envVar.Key == "VCAP_APPLICATION" {
 						vcapAppEnv = envVar.Value
 					}
