@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	"github.com/cloudfoundry/gunk/natsrunner"
 	"github.com/cloudfoundry/gunk/timeprovider"
 	"github.com/cloudfoundry/yagnats"
@@ -74,36 +73,7 @@ var _ = Describe("Main", func() {
 			})
 
 			It("desires a long running process in the BBS", func() {
-				zero := 0
-
-				Eventually(bbs.GetAllTransitionalLongRunningProcesses, 0.5).Should(Equal(
-					[]models.TransitionalLongRunningProcess{
-						{
-							Guid: "the-app-guid-the-app-version",
-							Actions: []models.ExecutorAction{
-								{
-									Action: models.DownloadAction{
-										From:     "http://the-droplet.uri.com",
-										To:       ".",
-										Extract:  true,
-										CacheKey: "droplets-the-app-guid-the-app-version",
-									},
-								},
-								{
-									Action: models.RunAction{
-										Script: "cd ./app && the-start-command",
-									},
-								},
-							},
-							Log: models.LogConfig{
-								Guid:       "the-app-guid",
-								SourceName: "App",
-								Index:      &zero,
-							},
-							State: models.TransitionalLRPStateDesired,
-						},
-					},
-				))
+				Eventually(bbs.GetAllTransitionalLongRunningProcesses, 0.5).Should(HaveLen(1))
 			})
 		})
 	})

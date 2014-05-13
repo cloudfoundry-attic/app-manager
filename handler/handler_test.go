@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"errors"
+	"fmt"
 	. "github.com/cloudfoundry-incubator/app-manager/handler"
 	"github.com/cloudfoundry-incubator/runtime-schema/bbs/fake_bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
@@ -44,7 +45,11 @@ var _ = Describe("Inbox", func() {
             "app_id": "the-app-guid",
             "app_version": "the-app-version",
             "droplet_uri": "http://the-droplet.uri.com",
-            "start_command": "the-start-command"
+            "start_command": "the-start-command",
+						"environment": [
+							{"key":"foo","value":"bar"},
+							{"key":"VCAP_APPLICATION", "value":"{\"application_name\":\"my-app\"}"}
+						]
           }
         `))
 			})
@@ -78,6 +83,46 @@ var _ = Describe("Inbox", func() {
 						},
 					},
 				}))
+
+				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+					Key:   "foo",
+					Value: "bar",
+				}))
+
+				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+					Key:   "PORT",
+					Value: "8080",
+				}))
+
+				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+					Key:   "VCAP_APP_PORT",
+					Value: "8080",
+				}))
+
+				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+					Key:   "VCAP_APP_HOST",
+					Value: "0.0.0.0",
+				}))
+
+				Ω(lrp.Environment).Should(ContainElement(models.EnvironmentVariable{
+					Key:   "TMPDIR",
+					Value: "$HOME/tmp",
+				}))
+
+				var vcapAppEnv string
+				for _, envVar := range lrp.Environment {
+					if envVar.Key == "VCAP_APPLICATION" {
+						vcapAppEnv = envVar.Value
+					}
+				}
+
+				Ω(vcapAppEnv).Should(MatchJSON(fmt.Sprintf(`{
+					"application_name": "my-app",
+					"host":             "0.0.0.0",
+					"port":             8080,
+					"instance_id":      "%s",
+					"instance_index":   %d 
+				}`, lrp.Guid, *lrp.Log.Index)))
 			})
 
 			Describe("when there is an error writing to the BBS", func() {

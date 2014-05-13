@@ -26,7 +26,7 @@ func NewHandler(natsClient yagnats.NATSClient, bbs Bbs.AppManagerBBS, logger *st
 
 func (h Handler) Start() {
 	h.natsClient.Subscribe("diego.desire.app", func(message *yagnats.Message) {
-		desireAppMessage := DesireAppNATSMessage{}
+		desireAppMessage := models.DesireAppRequestFromCC{}
 		err := json.Unmarshal(message.Payload, &desireAppMessage)
 		if err != nil {
 			h.logger.Errorf("Failed to parse NATS message.")
@@ -35,6 +35,11 @@ func (h Handler) Start() {
 
 		lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
 		lrpIndex := 0
+
+		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
+		if err != nil {
+
+		}
 
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
@@ -61,6 +66,7 @@ func (h Handler) Start() {
 					},
 				},
 			},
+			Environment: lrpEnv,
 		})
 
 		if err != nil {
@@ -69,9 +75,39 @@ func (h Handler) Start() {
 	})
 }
 
-type DesireAppNATSMessage struct {
-	AppId        string `json:"app_id"`
-	AppVersion   string `json:"app_version"`
-	DropletUri   string `json:"droplet_uri"`
-	StartCommand string `json:"start_command"`
+func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int) ([]models.EnvironmentVariable, error) {
+	env = append(env, models.EnvironmentVariable{Key: "PORT", Value: "8080"})
+	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_PORT", Value: "8080"})
+	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_HOST", Value: "0.0.0.0"})
+	env = append(env, models.EnvironmentVariable{Key: "TMPDIR", Value: "$HOME/tmp"})
+
+	vcapAppEnv := map[string]interface{}{}
+	vcapAppEnvIndex := -1
+	for i, envVar := range env {
+		if envVar.Key == "VCAP_APPLICATION" {
+			vcapAppEnvIndex = i
+			err := json.Unmarshal([]byte(envVar.Value), &vcapAppEnv)
+			if err != nil {
+				return env, err
+			}
+		}
+	}
+
+	if vcapAppEnvIndex == -1 {
+		return env, nil
+	}
+
+	vcapAppEnv["port"] = 8080
+	vcapAppEnv["host"] = "0.0.0.0"
+	vcapAppEnv["instance_id"] = lrpGuid
+	vcapAppEnv["instance_index"] = lrpIndex
+
+	lrpEnv, err := json.Marshal(vcapAppEnv)
+	if err != nil {
+		return env, err
+	}
+	env = append(env[:vcapAppEnvIndex], env[vcapAppEnvIndex+1:]...)
+	env = append(env, models.EnvironmentVariable{Key: "VCAP_APPLICATION", Value: string(lrpEnv)})
+
+	return env, nil
 }
