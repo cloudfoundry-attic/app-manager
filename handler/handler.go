@@ -44,6 +44,7 @@ func (h Handler) Start() {
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
 			State: models.TransitionalLRPStateDesired,
+			Stack: desireAppMessage.Stack,
 			Log: models.LogConfig{
 				Guid:       desireAppMessage.AppId,
 				SourceName: "App",

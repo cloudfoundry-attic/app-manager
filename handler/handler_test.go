@@ -46,6 +46,7 @@ var _ = Describe("Inbox", func() {
             "app_version": "the-app-version",
             "droplet_uri": "http://the-droplet.uri.com",
             "start_command": "the-start-command",
+						"stack": "some-stack",
 						"environment": [
 							{"key":"foo","value":"bar"},
 							{"key":"VCAP_APPLICATION", "value":"{\"application_name\":\"my-app\"}"}
@@ -59,6 +60,7 @@ var _ = Describe("Inbox", func() {
 
 				lrp := bbs.DesiredLrps()[0]
 				Ω(lrp.Guid).Should(Equal("the-app-guid-the-app-version"))
+				Ω(lrp.Stack).Should(Equal("some-stack"))
 				Ω(lrp.State).Should(Equal(models.TransitionalLRPStateDesired))
 
 				zero := 0
