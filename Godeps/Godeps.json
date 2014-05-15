@@ -7,11 +7,11 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "bd1c7fd36ae93fe0deede41b5f590c33844673d2"
+			"Rev": "bb4a57effde8f752dc4c465cf8c8207203499163"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "bd1c7fd36ae93fe0deede41b5f590c33844673d2"
+			"Rev": "bb4a57effde8f752dc4c465cf8c8207203499163"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
