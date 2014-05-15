@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	. "github.com/cloudfoundry-incubator/app-manager/handler"
@@ -15,10 +16,12 @@ import (
 
 var _ = Describe("Inbox", func() {
 	var (
-		fakenats *fakeyagnats.FakeYagnats
-		bbs      *fake_bbs.FakeAppManagerBBS
-		logSink  *steno.TestingSink
-		handler  Handler
+		fakenats         *fakeyagnats.FakeYagnats
+		bbs              *fake_bbs.FakeAppManagerBBS
+		logSink          *steno.TestingSink
+		desireAppRequest models.DesireAppRequestFromCC
+
+		handler Handler
 	)
 
 	BeforeEach(func() {
@@ -31,6 +34,21 @@ var _ = Describe("Inbox", func() {
 		fakenats = fakeyagnats.New()
 		bbs = fake_bbs.NewFakeAppManagerBBS()
 		handler = NewHandler(fakenats, bbs, logger)
+
+		desireAppRequest = models.DesireAppRequestFromCC{
+			AppId:        "the-app-guid",
+			AppVersion:   "the-app-version",
+			DropletUri:   "http://the-droplet.uri.com",
+			Stack:        "some-stack",
+			StartCommand: "the-start-command",
+			Environment: []models.EnvironmentVariable{
+				{Key: "foo", Value: "bar"},
+				{Key: "VCAP_APPLICATION", Value: "{\"application_name\":\"my-app\"}"},
+			},
+			MemoryMB:        128,
+			DiskMB:          512,
+			FileDescriptors: 32,
+		}
 	})
 
 	Describe("Start", func() {
@@ -40,22 +58,10 @@ var _ = Describe("Inbox", func() {
 
 		Describe("when a 'diego.desire.app' message is received", func() {
 			JustBeforeEach(func() {
-				fakenats.Publish("diego.desire.app", []byte(`
-          {
-            "app_id": "the-app-guid",
-            "app_version": "the-app-version",
-            "droplet_uri": "http://the-droplet.uri.com",
-            "start_command": "the-start-command",
-						"stack": "some-stack",
-						"environment": [
-							{"key":"foo","value":"bar"},
-							{"key":"VCAP_APPLICATION", "value":"{\"application_name\":\"my-app\"}"}
-						],
-						"memory_mb" : 128,
-						"disk_mb" : 512,
-						"file_descriptors" : 32
-          }
-        `))
+				messagePayload, err := json.Marshal(desireAppRequest)
+				Ω(err).ShouldNot(HaveOccurred())
+
+				fakenats.Publish("diego.desire.app", messagePayload)
 			})
 
 			It("puts a desired LRP in the BBS for the given app", func() {
@@ -142,6 +148,25 @@ var _ = Describe("Inbox", func() {
 				It("logs an error", func() {
 					Ω(logSink.Records()).Should(HaveLen(1))
 					Ω(logSink.Records()[0].Message).Should(ContainSubstring("connection error"))
+				})
+			})
+
+			Context("when there is no file descriptor limit", func() {
+				BeforeEach(func() {
+					desireAppRequest.FileDescriptors = 0
+				})
+
+				It("does not set any FD limit on the run action", func() {
+					Ω(bbs.DesiredLrps()).Should(HaveLen(1))
+
+					lrp := bbs.DesiredLrps()[0]
+
+					Ω(lrp.Actions).Should(HaveLen(2))
+					runAction, ok := lrp.Actions[1].Action.(models.RunAction)
+					Ω(ok).Should(BeTrue())
+					Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
+						Nofile: nil,
+					}))
 				})
 			})
 		})

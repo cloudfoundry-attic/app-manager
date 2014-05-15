@@ -36,7 +36,10 @@ func (h Handler) Start() {
 		lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
 		lrpIndex := 0
 
-		numFiles := uint64(desireAppMessage.FileDescriptors)
+		var numFiles *uint64
+		if desireAppMessage.FileDescriptors != 0 {
+			numFiles = &desireAppMessage.FileDescriptors
+		}
 
 		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
 		if err != nil {
@@ -71,7 +74,7 @@ func (h Handler) Start() {
 						Env:     lrpEnv,
 						Timeout: 0,
 						ResourceLimits: models.ResourceLimits{
-							Nofile: &numFiles,
+							Nofile: numFiles,
 						},
 					},
 				},
