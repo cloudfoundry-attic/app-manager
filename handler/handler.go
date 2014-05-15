@@ -36,6 +36,8 @@ func (h Handler) Start() {
 		lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
 		lrpIndex := 0
 
+		numFiles := uint64(desireAppMessage.FileDescriptors)
+
 		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
 		if err != nil {
 
@@ -44,6 +46,10 @@ func (h Handler) Start() {
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
 			State: models.TransitionalLRPStateDesired,
+
+			MemoryMB: desireAppMessage.MemoryMB,
+			DiskMB:   desireAppMessage.DiskMB,
+
 			Stack: desireAppMessage.Stack,
 			Log: models.LogConfig{
 				Guid:       desireAppMessage.AppId,
@@ -64,6 +70,9 @@ func (h Handler) Start() {
 						Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
 						Env:     lrpEnv,
 						Timeout: 0,
+						ResourceLimits: models.ResourceLimits{
+							Nofile: &numFiles,
+						},
 					},
 				},
 			},

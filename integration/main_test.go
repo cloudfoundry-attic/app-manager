@@ -67,7 +67,10 @@ var _ = Describe("Main", func() {
 	          "app_id": "the-app-guid",
   	        "app_version": "the-app-version",
 	          "droplet_uri": "http://the-droplet.uri.com",
-    	      "start_command": "the-start-command"
+    	      "start_command": "the-start-command",
+						"memory_mb" : 128,
+						"disk_mb" : 512,
+						"file_descriptors" : 32
 		      }
 				`))
 			})

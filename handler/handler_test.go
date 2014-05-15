@@ -50,7 +50,10 @@ var _ = Describe("Inbox", func() {
 						"environment": [
 							{"key":"foo","value":"bar"},
 							{"key":"VCAP_APPLICATION", "value":"{\"application_name\":\"my-app\"}"}
-						]
+						],
+						"memory_mb" : 128,
+						"disk_mb" : 512,
+						"file_descriptors" : 32
           }
         `))
 			})
@@ -62,8 +65,11 @@ var _ = Describe("Inbox", func() {
 				Ω(lrp.Guid).Should(Equal("the-app-guid-the-app-version"))
 				Ω(lrp.Stack).Should(Equal("some-stack"))
 				Ω(lrp.State).Should(Equal(models.TransitionalLRPStateDesired))
+				Ω(lrp.MemoryMB).Should(Equal(128))
+				Ω(lrp.DiskMB).Should(Equal(512))
 
 				zero := 0
+				numFiles := uint64(32)
 				Ω(lrp.Log).Should(Equal(models.LogConfig{
 					Guid:       "the-app-guid",
 					SourceName: "App",
@@ -83,6 +89,9 @@ var _ = Describe("Inbox", func() {
 				Ω(ok).Should(BeTrue())
 
 				Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
+				Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
+					Nofile: &numFiles,
+				}))
 
 				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 					Key:   "foo",
@@ -121,7 +130,7 @@ var _ = Describe("Inbox", func() {
 					"host":             "0.0.0.0",
 					"port":             8080,
 					"instance_id":      "%s",
-					"instance_index":   %d 
+					"instance_index":   %d
 				}`, lrp.Guid, *lrp.Log.Index)))
 			})
 
