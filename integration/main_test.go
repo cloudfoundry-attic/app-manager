@@ -40,7 +40,7 @@ var _ = Describe("Main", func() {
 
 		natsClient = natsRunner.MessageBus
 
-		bbs = Bbs.New(etcdRunner.Adapter(), timeprovider.NewTimeProvider())
+		bbs = Bbs.NewBBS(etcdRunner.Adapter(), timeprovider.NewTimeProvider())
 
 		runner = app_manager_runner.New(
 			appManagerPath,
