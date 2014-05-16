@@ -46,6 +46,47 @@ func (h Handler) Start() {
 
 		}
 
+		for index := 0; index < desireAppMessage.NumInstances; index++ {
+			err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
+				Guid:  lrpGuid,
+				State: models.LRPStartAuctionStatePending,
+				Index: index,
+
+				MemoryMB: desireAppMessage.MemoryMB,
+				DiskMB:   desireAppMessage.DiskMB,
+
+				Stack: desireAppMessage.Stack,
+				Log: models.LogConfig{
+					Guid:       desireAppMessage.AppId,
+					SourceName: "App",
+					Index:      &lrpIndex,
+				},
+				Actions: []models.ExecutorAction{
+					{
+						Action: models.DownloadAction{
+							From:     desireAppMessage.DropletUri,
+							To:       ".",
+							Extract:  true,
+							CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
+						},
+					},
+					{
+						Action: models.RunAction{
+							Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
+							Env:     lrpEnv,
+							Timeout: 0,
+							ResourceLimits: models.ResourceLimits{
+								Nofile: numFiles,
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				h.logger.Errorf("Error writing to BBS: %s", err.Error())
+			}
+		}
+
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
 			State: models.TransitionalLRPStateDesired,

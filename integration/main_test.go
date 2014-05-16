@@ -70,13 +70,18 @@ var _ = Describe("Main", func() {
     	      "start_command": "the-start-command",
 						"memory_mb" : 128,
 						"disk_mb" : 512,
-						"file_descriptors" : 32
+						"file_descriptors" : 32,
+						"num_instances" : 3
 		      }
 				`))
 			})
 
 			It("desires a long running process in the BBS", func() {
 				Eventually(bbs.GetAllTransitionalLongRunningProcesses, 0.5).Should(HaveLen(1))
+			})
+
+			It("desires N start auctions in the BBS", func() {
+				Eventually(bbs.GetAllLRPStartAuctions, 0.5).Should(HaveLen(3))
 			})
 		})
 	})
