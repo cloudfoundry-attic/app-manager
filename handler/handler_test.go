@@ -73,6 +73,7 @@ var _ = Describe("Inbox", func() {
 
 				Ω(firstStartAuction.Index).Should(Equal(0))
 				Ω(firstStartAuction.Guid).Should(Equal("the-app-guid-the-app-version"))
+				Ω(firstStartAuction.InstanceGuid).ShouldNot(BeEmpty())
 				Ω(firstStartAuction.Stack).Should(Equal("some-stack"))
 				Ω(firstStartAuction.State).Should(Equal(models.LRPStartAuctionStatePending))
 				Ω(firstStartAuction.MemoryMB).Should(Equal(128))
@@ -145,6 +146,16 @@ var _ = Describe("Inbox", func() {
 
 				secondStartAuction := startAuctions[1]
 				Ω(secondStartAuction.Index).Should(Equal(1))
+				Ω(secondStartAuction.InstanceGuid).ShouldNot(BeEmpty())
+			})
+
+			It("assigns unique instance guids to the auction requests", func() {
+				startAuctions := bbs.GetLRPStartAuctions()
+				Ω(startAuctions).Should(HaveLen(2))
+
+				firstStartAuction := startAuctions[0]
+				secondStartAuction := startAuctions[1]
+				Ω(firstStartAuction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
 			})
 
 			Describe("when there is an error writing a LRPStartAuction to the BBS", func() {

@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/nu7hatch/gouuid"
 )
 
 type Handler struct {
@@ -47,10 +48,16 @@ func (h Handler) Start() {
 		}
 
 		for index := 0; index < desireAppMessage.NumInstances; index++ {
+			instanceGuid, err := uuid.NewV4()
+			if err != nil {
+				h.logger.Errorf("Error generating instance guid: %s", err.Error())
+				continue
+			}
 			err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
-				Guid:  lrpGuid,
-				State: models.LRPStartAuctionStatePending,
-				Index: index,
+				Guid:         lrpGuid,
+				InstanceGuid: instanceGuid.String(),
+				State:        models.LRPStartAuctionStatePending,
+				Index:        index,
 
 				MemoryMB: desireAppMessage.MemoryMB,
 				DiskMB:   desireAppMessage.DiskMB,
