@@ -23,6 +23,9 @@ type ExecutorBBS interface {
 }
 
 type RepBBS interface {
+	//services
+	MaintainRepPresence(heartbeatInterval time.Duration, repPresence models.RepPresence) (services_bbs.Presence, <-chan bool, error)
+
 	//task
 	WatchForDesiredTask() (<-chan models.Task, chan<- bool, <-chan error)
 	ClaimTask(task models.Task, executorID string) (models.Task, error)
@@ -46,12 +49,18 @@ type AppManagerBBS interface {
 	//lrp
 	DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess) error
 	RequestLRPStartAuction(models.LRPStartAuction) error
+
+	//services
+	GetAvailableFileServer() (string, error)
 }
 
 type AuctioneerBBS interface {
+	//services
+	GetAllReps() ([]models.RepPresence, error)
+
 	//lrp
 	WatchForLRPStartAuction() (<-chan models.LRPStartAuction, chan<- bool, <-chan error)
-	ClaimLPRStartAuction(models.LRPStartAuction) error
+	ClaimLRPStartAuction(models.LRPStartAuction) error
 	ResolveLRPStartAuction(models.LRPStartAuction) error
 }
 
@@ -96,6 +105,10 @@ func NewConvergerBBS(store storeadapter.StoreAdapter, timeProvider timeprovider.
 }
 
 func NewAppManagerBBS(store storeadapter.StoreAdapter, timeProvider timeprovider.TimeProvider) AppManagerBBS {
+	return NewBBS(store, timeProvider)
+}
+
+func NewAuctioneerBBS(store storeadapter.StoreAdapter, timeProvider timeprovider.TimeProvider) AuctioneerBBS {
 	return NewBBS(store, timeProvider)
 }
 

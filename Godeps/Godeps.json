@@ -7,11 +7,11 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "02e1c2e130d02877a5ab9ece71aa6bbce4110d52"
+			"Rev": "32c4faf4c6263274591023a85430b39d239941c0"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "02e1c2e130d02877a5ab9ece71aa6bbce4110d52"
+			"Rev": "32c4faf4c6263274591023a85430b39d239941c0"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -32,7 +32,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "2c197cfdcd587274614ab63fef96bbaaa1c01f10"
+			"Rev": "0a1eb23c2029f690cd5cb35280180a2e47e54af0"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
