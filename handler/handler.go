@@ -2,26 +2,44 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 
+	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
+	SchemaRouter "github.com/cloudfoundry-incubator/runtime-schema/router"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/gunk/urljoiner"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/nu7hatch/gouuid"
+	"github.com/tedsuo/router"
 )
 
+var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
+
 type Handler struct {
-	natsClient yagnats.NATSClient
-	bbs        Bbs.AppManagerBBS
-	logger     *steno.Logger
+	repAddrRelativeToExecutor string
+	healthChecks              map[string]string
+	natsClient                yagnats.NATSClient
+	bbs                       Bbs.AppManagerBBS
+	logger                    *steno.Logger
 }
 
-func NewHandler(natsClient yagnats.NATSClient, bbs Bbs.AppManagerBBS, logger *steno.Logger) Handler {
+func NewHandler(
+	repAddrRelativeToExecutor string,
+	healthChecks map[string]string,
+	natsClient yagnats.NATSClient,
+	bbs Bbs.AppManagerBBS,
+	logger *steno.Logger,
+) Handler {
 	return Handler{
-		natsClient: natsClient,
-		bbs:        bbs,
-		logger:     logger,
+		repAddrRelativeToExecutor: repAddrRelativeToExecutor,
+		healthChecks:              healthChecks,
+		natsClient:                natsClient,
+		bbs:                       bbs,
+		logger:                    logger,
 	}
 }
 
@@ -44,7 +62,62 @@ func (h Handler) Start() {
 
 		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
 		if err != nil {
+			h.logger.Warnd(
+				map[string]interface{}{
+					"error": err.Error(),
+				},
+				"handler.constructing-env.failed",
+			)
 
+			return
+		}
+
+		fileServerURL, err := h.bbs.GetAvailableFileServer()
+		if err != nil {
+			h.logger.Warnd(
+				map[string]interface{}{
+					"error": err.Error(),
+				},
+				"handler.get-available-file-server.failed",
+			)
+
+			return
+		}
+
+		healthCheckURL, err := h.healthCheckDownloadURL(desireAppMessage.Stack, fileServerURL)
+		if err != nil {
+			h.logger.Warnd(
+				map[string]interface{}{
+					"error": err.Error(),
+					"stack": desireAppMessage.Stack,
+				},
+				"handler.construct-health-check-download-url.failed",
+			)
+
+			return
+		}
+
+		repRequests := router.NewRequestGenerator(
+			"http://"+h.repAddrRelativeToExecutor,
+			RepRoutes.Routes,
+		)
+
+		healthyHook, err := repRequests.RequestForHandler(
+			RepRoutes.RouteHealthy,
+			router.Params{"guid": lrpGuid},
+			nil,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		unhealthyHook, err := repRequests.RequestForHandler(
+			RepRoutes.RouteUnhealthy,
+			router.Params{"guid": lrpGuid},
+			nil,
+		)
+		if err != nil {
+			panic(err)
 		}
 
 		for index := 0; index < desireAppMessage.NumInstances; index++ {
@@ -62,6 +135,10 @@ func (h Handler) Start() {
 				MemoryMB: desireAppMessage.MemoryMB,
 				DiskMB:   desireAppMessage.DiskMB,
 
+				Ports: []models.PortMapping{
+					{ContainerPort: 8080},
+				},
+
 				Stack: desireAppMessage.Stack,
 				Log: models.LogConfig{
 					Guid:       desireAppMessage.AppId,
@@ -71,28 +148,56 @@ func (h Handler) Start() {
 				Actions: []models.ExecutorAction{
 					{
 						Action: models.DownloadAction{
+							From:    healthCheckURL.String(),
+							To:      "/tmp/diego-health-check",
+							Extract: true,
+						},
+					},
+					{
+						Action: models.DownloadAction{
 							From:     desireAppMessage.DropletUri,
 							To:       ".",
 							Extract:  true,
 							CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
 						},
 					},
-					{
-						Action: models.RunAction{
-							Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
-							Env:     lrpEnv,
-							Timeout: 0,
-							ResourceLimits: models.ResourceLimits{
-								Nofile: numFiles,
+					models.Parallel(
+						models.ExecutorAction{
+							models.RunAction{
+								Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
+								Env:     lrpEnv,
+								Timeout: 0,
+								ResourceLimits: models.ResourceLimits{
+									Nofile: numFiles,
+								},
 							},
 						},
-					},
+						models.ExecutorAction{
+							models.MonitorAction{
+								Action: models.ExecutorAction{
+									models.RunAction{
+										Script: "/tmp/diego-health-check -addr=:8080",
+									},
+								},
+								HealthyHook: models.HealthRequest{
+									Method: healthyHook.Method,
+									URL:    healthyHook.URL.String(),
+								},
+								UnhealthyHook: models.HealthRequest{
+									Method: unhealthyHook.Method,
+									URL:    unhealthyHook.URL.String(),
+								},
+							},
+						},
+					),
 				},
 			})
 			if err != nil {
 				h.logger.Errorf("Error writing to BBS: %s", err.Error())
 			}
 		}
+
+		// 8<--------------------------------------------------------------------------
 
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
@@ -133,6 +238,27 @@ func (h Handler) Start() {
 			h.logger.Errorf("Error writing to BBS: %s", err.Error())
 		}
 	})
+}
+
+func (h Handler) healthCheckDownloadURL(stack string, fileServerURL string) (*url.URL, error) {
+	checkPath, ok := h.healthChecks[stack]
+	if !ok {
+		return nil, ErrNoHealthCheckDefined
+	}
+
+	staticRoute, ok := SchemaRouter.NewFileServerRoutes().RouteForHandler(SchemaRouter.FS_STATIC)
+	if !ok {
+		return nil, errors.New("couldn't generate the compiler download path")
+	}
+
+	urlString := urljoiner.Join(fileServerURL, staticRoute.Path, checkPath)
+
+	url, err := url.ParseRequestURI(urlString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse compiler download URL: %s", err)
+	}
+
+	return url, nil
 }
 
 func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int) ([]models.EnvironmentVariable, error) {

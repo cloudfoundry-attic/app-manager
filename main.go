@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"log"
 	"os"
 	"strings"
 
@@ -13,6 +15,12 @@ import (
 	"github.com/cloudfoundry/yagnats"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
+)
+
+var repAddrRelativeToExecutor = flag.String(
+	"repAddrRelativeToExecutor",
+	"127.0.0.1:20515",
+	"address of the rep server that should receive health status updates",
 )
 
 var etcdCluster = flag.String(
@@ -45,6 +53,12 @@ var syslogName = flag.String(
 	"syslog name",
 )
 
+var healthChecks = flag.String(
+	"healthChecks",
+	"",
+	"health check mapping (stack => health check filename in fileserver)",
+)
+
 func main() {
 	flag.Parse()
 
@@ -52,7 +66,13 @@ func main() {
 	natsClient := initializeNatsClient(logger)
 	bbs := initializeBbs(logger)
 
-	handler.NewHandler(natsClient, bbs, logger).Start()
+	var healthCheckDownloadURLs map[string]string
+	err := json.Unmarshal([]byte(*healthChecks), &healthCheckDownloadURLs)
+	if err != nil {
+		log.Fatalln("invalid health checks:", err)
+	}
+
+	handler.NewHandler(*repAddrRelativeToExecutor, healthCheckDownloadURLs, natsClient, bbs, logger).Start()
 
 	logger.Infof("app_manager.started")
 

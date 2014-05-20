@@ -1,6 +1,7 @@
 package app_manager_runner
 
 import (
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"time"
@@ -15,14 +16,16 @@ type AppManagerRunner struct {
 	appManagerBin string
 	etcdCluster   []string
 	natsCluster   []string
+	healthChecks  map[string]string
 	Session       *gexec.Session
 }
 
-func New(appManagerBin string, etcdCluster, natsCluster []string) *AppManagerRunner {
+func New(appManagerBin string, etcdCluster, natsCluster []string, healthChecks map[string]string) *AppManagerRunner {
 	return &AppManagerRunner{
 		appManagerBin: appManagerBin,
 		etcdCluster:   etcdCluster,
 		natsCluster:   natsCluster,
+		healthChecks:  healthChecks,
 	}
 }
 
@@ -32,16 +35,21 @@ func (r *AppManagerRunner) Start() {
 }
 
 func (r *AppManagerRunner) StartWithoutCheck() {
+	healthChecksFlag, err := json.Marshal(r.healthChecks)
+	Ω(err).ShouldNot(HaveOccurred())
+
 	executorSession, err := gexec.Start(
 		exec.Command(
 			r.appManagerBin,
 			"-etcdCluster", strings.Join(r.etcdCluster, ","),
 			"-natsAddresses", strings.Join(r.natsCluster, ","),
+			"-healthChecks", string(healthChecksFlag),
 		),
 		ginkgo.GinkgoWriter,
 		ginkgo.GinkgoWriter,
 	)
 	Ω(err).ShouldNot(HaveOccurred())
+
 	r.Session = executorSession
 }
 

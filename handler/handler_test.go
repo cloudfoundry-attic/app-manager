@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry-incubator/runtime-schema/bbs/fake_bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/storeadapter"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
 
 	. "github.com/onsi/ginkgo"
@@ -16,24 +17,36 @@ import (
 
 var _ = Describe("Inbox", func() {
 	var (
-		fakenats         *fakeyagnats.FakeYagnats
-		bbs              *fake_bbs.FakeAppManagerBBS
-		logSink          *steno.TestingSink
-		desireAppRequest models.DesireAppRequestFromCC
+		fakenats                  *fakeyagnats.FakeYagnats
+		bbs                       *fake_bbs.FakeAppManagerBBS
+		logSink                   *steno.TestingSink
+		desireAppRequest          models.DesireAppRequestFromCC
+		repAddrRelativeToExecutor string
+		healthChecks              map[string]string
 
 		handler Handler
 	)
 
 	BeforeEach(func() {
 		logSink = steno.NewTestingSink()
+
 		steno.Init(&steno.Config{
 			Sinks: []steno.Sink{logSink},
 		})
+
 		logger := steno.NewLogger("the-logger")
 
 		fakenats = fakeyagnats.New()
+
 		bbs = fake_bbs.NewFakeAppManagerBBS()
-		handler = NewHandler(fakenats, bbs, logger)
+
+		repAddrRelativeToExecutor = "127.0.0.1:20515"
+
+		healthChecks = map[string]string{
+			"some-stack": "some-health-check.tgz",
+		}
+
+		handler = NewHandler(repAddrRelativeToExecutor, healthChecks, fakenats, bbs, logger)
 
 		desireAppRequest = models.DesireAppRequestFromCC{
 			AppId:        "the-app-guid",
@@ -65,97 +78,148 @@ var _ = Describe("Inbox", func() {
 				fakenats.Publish("diego.desire.app", messagePayload)
 			})
 
-			It("puts a LRPStartAuction in the bbs", func() {
-				startAuctions := bbs.GetLRPStartAuctions()
-				Ω(startAuctions).Should(HaveLen(2))
-
-				firstStartAuction := startAuctions[0]
-
-				Ω(firstStartAuction.Index).Should(Equal(0))
-				Ω(firstStartAuction.Guid).Should(Equal("the-app-guid-the-app-version"))
-				Ω(firstStartAuction.InstanceGuid).ShouldNot(BeEmpty())
-				Ω(firstStartAuction.Stack).Should(Equal("some-stack"))
-				Ω(firstStartAuction.State).Should(Equal(models.LRPStartAuctionStatePending))
-				Ω(firstStartAuction.MemoryMB).Should(Equal(128))
-				Ω(firstStartAuction.DiskMB).Should(Equal(512))
-
-				zero := 0
-				numFiles := uint64(32)
-				Ω(firstStartAuction.Log).Should(Equal(models.LogConfig{
-					Guid:       "the-app-guid",
-					SourceName: "App",
-					Index:      &zero,
-				}))
-
-				Ω(firstStartAuction.Actions).Should(HaveLen(2))
-
-				Ω(firstStartAuction.Actions[0].Action).Should(Equal(models.DownloadAction{
-					From:     "http://the-droplet.uri.com",
-					To:       ".",
-					Extract:  true,
-					CacheKey: "droplets-the-app-guid-the-app-version",
-				}))
-
-				runAction, ok := firstStartAuction.Actions[1].Action.(models.RunAction)
-				Ω(ok).Should(BeTrue())
-
-				Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
-				Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
-					Nofile: &numFiles,
-				}))
-
-				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-					Key:   "foo",
-					Value: "bar",
-				}))
-
-				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-					Key:   "PORT",
-					Value: "8080",
-				}))
-
-				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-					Key:   "VCAP_APP_PORT",
-					Value: "8080",
-				}))
-
-				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-					Key:   "VCAP_APP_HOST",
-					Value: "0.0.0.0",
-				}))
-
-				Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-					Key:   "TMPDIR",
-					Value: "$HOME/tmp",
-				}))
-
-				var vcapAppEnv string
-				for _, envVar := range runAction.Env {
-					if envVar.Key == "VCAP_APPLICATION" {
-						vcapAppEnv = envVar.Value
+			Context("when file the server is available", func() {
+				BeforeEach(func() {
+					bbs.WhenGettingAvailableFileServer = func() (string, error) {
+						return "http://file-server.com/", nil
 					}
-				}
+				})
 
-				Ω(vcapAppEnv).Should(MatchJSON(fmt.Sprintf(`{
-					"application_name": "my-app",
-					"host":             "0.0.0.0",
-					"port":             8080,
-					"instance_id":      "%s",
-					"instance_index":   %d
-				}`, firstStartAuction.Guid, *firstStartAuction.Log.Index)))
+				It("puts a LRPStartAuction in the bbs", func() {
+					startAuctions := bbs.GetLRPStartAuctions()
+					Ω(startAuctions).Should(HaveLen(2))
 
-				secondStartAuction := startAuctions[1]
-				Ω(secondStartAuction.Index).Should(Equal(1))
-				Ω(secondStartAuction.InstanceGuid).ShouldNot(BeEmpty())
+					firstStartAuction := startAuctions[0]
+
+					Ω(firstStartAuction.Index).Should(Equal(0))
+					Ω(firstStartAuction.Guid).Should(Equal("the-app-guid-the-app-version"))
+					Ω(firstStartAuction.InstanceGuid).ShouldNot(BeEmpty())
+					Ω(firstStartAuction.Stack).Should(Equal("some-stack"))
+					Ω(firstStartAuction.State).Should(Equal(models.LRPStartAuctionStatePending))
+					Ω(firstStartAuction.MemoryMB).Should(Equal(128))
+					Ω(firstStartAuction.DiskMB).Should(Equal(512))
+					Ω(firstStartAuction.Ports).Should(Equal([]models.PortMapping{{ContainerPort: 8080}}))
+
+					zero := 0
+					numFiles := uint64(32)
+					Ω(firstStartAuction.Log).Should(Equal(models.LogConfig{
+						Guid:       "the-app-guid",
+						SourceName: "App",
+						Index:      &zero,
+					}))
+
+					Ω(firstStartAuction.Actions).Should(HaveLen(3))
+
+					Ω(firstStartAuction.Actions[0].Action).Should(Equal(models.DownloadAction{
+						From:    "http://file-server.com/v1/static/some-health-check.tgz",
+						To:      "/tmp/diego-health-check",
+						Extract: true,
+					}))
+
+					Ω(firstStartAuction.Actions[1].Action).Should(Equal(models.DownloadAction{
+						From:     "http://the-droplet.uri.com",
+						To:       ".",
+						Extract:  true,
+						CacheKey: "droplets-the-app-guid-the-app-version",
+					}))
+
+					parallelAction, ok := firstStartAuction.Actions[2].Action.(models.ParallelAction)
+					Ω(ok).Should(BeTrue())
+
+					runAction, ok := parallelAction.Actions[0].Action.(models.RunAction)
+					Ω(ok).Should(BeTrue())
+
+					monitorAction, ok := parallelAction.Actions[1].Action.(models.MonitorAction)
+					Ω(ok).Should(BeTrue())
+
+					Ω(monitorAction.Action.Action).Should(Equal(models.RunAction{
+						Script: "/tmp/diego-health-check -addr=:8080",
+					}))
+
+					Ω(monitorAction.HealthyHook).Should(Equal(models.HealthRequest{
+						Method: "PUT",
+						URL:    "http://" + repAddrRelativeToExecutor + "/routes/the-app-guid-the-app-version/healthy",
+					}))
+
+					Ω(monitorAction.UnhealthyHook).Should(Equal(models.HealthRequest{
+						Method: "PUT",
+						URL:    "http://" + repAddrRelativeToExecutor + "/routes/the-app-guid-the-app-version/unhealthy",
+					}))
+
+					Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
+					Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
+						Nofile: &numFiles,
+					}))
+
+					Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+						Key:   "foo",
+						Value: "bar",
+					}))
+
+					Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+						Key:   "PORT",
+						Value: "8080",
+					}))
+
+					Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+						Key:   "VCAP_APP_PORT",
+						Value: "8080",
+					}))
+
+					Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+						Key:   "VCAP_APP_HOST",
+						Value: "0.0.0.0",
+					}))
+
+					Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+						Key:   "TMPDIR",
+						Value: "$HOME/tmp",
+					}))
+
+					var vcapAppEnv string
+					for _, envVar := range runAction.Env {
+						if envVar.Key == "VCAP_APPLICATION" {
+							vcapAppEnv = envVar.Value
+						}
+					}
+
+					Ω(vcapAppEnv).Should(MatchJSON(fmt.Sprintf(`{
+						"application_name": "my-app",
+						"host":             "0.0.0.0",
+						"port":             8080,
+						"instance_id":      "%s",
+						"instance_index":   %d
+					}`, firstStartAuction.Guid, *firstStartAuction.Log.Index)))
+
+					secondStartAuction := startAuctions[1]
+					Ω(secondStartAuction.Index).Should(Equal(1))
+					Ω(secondStartAuction.InstanceGuid).ShouldNot(BeEmpty())
+				})
+
+				It("assigns unique instance guids to the auction requests", func() {
+					startAuctions := bbs.GetLRPStartAuctions()
+					Ω(startAuctions).Should(HaveLen(2))
+
+					firstStartAuction := startAuctions[0]
+					secondStartAuction := startAuctions[1]
+
+					Ω(firstStartAuction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
+
+					Ω(secondStartAuction.Index).Should(Equal(1))
+				})
 			})
 
-			It("assigns unique instance guids to the auction requests", func() {
-				startAuctions := bbs.GetLRPStartAuctions()
-				Ω(startAuctions).Should(HaveLen(2))
+			Context("when file server is not available", func() {
+				BeforeEach(func() {
+					bbs.WhenGettingAvailableFileServer = func() (string, error) {
+						return "", storeadapter.ErrorKeyNotFound
+					}
+				})
 
-				firstStartAuction := startAuctions[0]
-				secondStartAuction := startAuctions[1]
-				Ω(firstStartAuction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
+				It("does not put a LRPStartAuction in the bbs", func() {
+					startAuctions := bbs.GetLRPStartAuctions()
+					Ω(startAuctions).Should(BeEmpty())
+				})
 			})
 
 			Describe("when there is an error writing a LRPStartAuction to the BBS", func() {
@@ -178,9 +242,14 @@ var _ = Describe("Inbox", func() {
 					startAuctions := bbs.GetLRPStartAuctions()
 					startAuction := startAuctions[0]
 
-					Ω(startAuction.Actions).Should(HaveLen(2))
-					runAction, ok := startAuction.Actions[1].Action.(models.RunAction)
+					Ω(startAuction.Actions).Should(HaveLen(3))
+
+					parallelAction, ok := startAuction.Actions[2].Action.(models.ParallelAction)
 					Ω(ok).Should(BeTrue())
+
+					runAction, ok := parallelAction.Actions[0].Action.(models.RunAction)
+					Ω(ok).Should(BeTrue())
+
 					Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
 						Nofile: nil,
 					}))
