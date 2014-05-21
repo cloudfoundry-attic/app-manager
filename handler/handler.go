@@ -102,30 +102,26 @@ func (h Handler) Start() {
 			RepRoutes.Routes,
 		)
 
-		healthyHook, err := repRequests.RequestForHandler(
-			RepRoutes.RouteHealthy,
-			router.Params{"guid": lrpGuid},
-			nil,
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		unhealthyHook, err := repRequests.RequestForHandler(
-			RepRoutes.RouteUnhealthy,
-			router.Params{"guid": lrpGuid},
-			nil,
-		)
-		if err != nil {
-			panic(err)
-		}
-
 		for index := 0; index < desireAppMessage.NumInstances; index++ {
 			instanceGuid, err := uuid.NewV4()
 			if err != nil {
 				h.logger.Errorf("Error generating instance guid: %s", err.Error())
 				continue
 			}
+
+			healthyHook, err := repRequests.RequestForHandler(
+				RepRoutes.LRPRunning,
+				router.Params{
+					"process_guid":  lrpGuid,
+					"index":         fmt.Sprintf("%d", index),
+					"instance_guid": instanceGuid.String(),
+				},
+				nil,
+			)
+			if err != nil {
+				panic(err)
+			}
+
 			err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
 				Guid:         lrpGuid,
 				InstanceGuid: instanceGuid.String(),
@@ -182,10 +178,6 @@ func (h Handler) Start() {
 								HealthyHook: models.HealthRequest{
 									Method: healthyHook.Method,
 									URL:    healthyHook.URL.String(),
-								},
-								UnhealthyHook: models.HealthRequest{
-									Method: unhealthyHook.Method,
-									URL:    unhealthyHook.URL.String(),
 								},
 							},
 						},

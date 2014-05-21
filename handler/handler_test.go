@@ -138,12 +138,7 @@ var _ = Describe("Inbox", func() {
 
 					Ω(monitorAction.HealthyHook).Should(Equal(models.HealthRequest{
 						Method: "PUT",
-						URL:    "http://" + repAddrRelativeToExecutor + "/routes/the-app-guid-the-app-version/healthy",
-					}))
-
-					Ω(monitorAction.UnhealthyHook).Should(Equal(models.HealthRequest{
-						Method: "PUT",
-						URL:    "http://" + repAddrRelativeToExecutor + "/routes/the-app-guid-the-app-version/unhealthy",
+						URL:    "http://" + repAddrRelativeToExecutor + "/lrp_running/the-app-guid-the-app-version/0/" + firstStartAuction.InstanceGuid,
 					}))
 
 					Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
