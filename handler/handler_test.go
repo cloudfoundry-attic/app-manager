@@ -210,8 +210,19 @@ var _ = Describe("Inbox", func() {
 					secondStartAuction := startAuctions[1]
 
 					Ω(firstStartAuction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
+				})
 
+				It("assigns increasing indices for the auction requests", func() {
+					startAuctions := bbs.GetLRPStartAuctions()
+					Ω(startAuctions).Should(HaveLen(2))
+
+					firstStartAuction := startAuctions[0]
+					secondStartAuction := startAuctions[1]
+
+					Ω(firstStartAuction.Index).Should(Equal(0))
+					Ω(*firstStartAuction.Log.Index).Should(Equal(0))
 					Ω(secondStartAuction.Index).Should(Equal(1))
+					Ω(*secondStartAuction.Log.Index).Should(Equal(1))
 				})
 
 				Context("when marking the LRP as desired fails", func() {

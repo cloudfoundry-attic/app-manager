@@ -53,7 +53,6 @@ func (h Handler) Start() {
 		}
 
 		lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
-		lrpIndex := 0
 
 		desiredLRP := models.DesiredLRP{
 			ProcessGuid: lrpGuid,
@@ -78,18 +77,6 @@ func (h Handler) Start() {
 		var numFiles *uint64
 		if desireAppMessage.FileDescriptors != 0 {
 			numFiles = &desireAppMessage.FileDescriptors
-		}
-
-		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
-		if err != nil {
-			h.logger.Warnd(
-				map[string]interface{}{
-					"error": err.Error(),
-				},
-				"handler.constructing-env.failed",
-			)
-
-			return
 		}
 
 		fileServerURL, err := h.bbs.GetAvailableFileServer()
@@ -123,17 +110,31 @@ func (h Handler) Start() {
 		)
 
 		for index := 0; index < desireAppMessage.NumInstances; index++ {
+			lrpIndex := index
+
 			instanceGuid, err := uuid.NewV4()
 			if err != nil {
 				h.logger.Errorf("Error generating instance guid: %s", err.Error())
 				continue
 			}
 
+			lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
+			if err != nil {
+				h.logger.Warnd(
+					map[string]interface{}{
+						"error": err.Error(),
+					},
+					"handler.constructing-env.failed",
+				)
+
+				return
+			}
+
 			healthyHook, err := repRequests.RequestForHandler(
 				RepRoutes.LRPRunning,
 				router.Params{
 					"process_guid":  lrpGuid,
-					"index":         fmt.Sprintf("%d", index),
+					"index":         fmt.Sprintf("%d", lrpIndex),
 					"instance_guid": instanceGuid.String(),
 				},
 				nil,
@@ -146,7 +147,7 @@ func (h Handler) Start() {
 				Guid:         lrpGuid,
 				InstanceGuid: instanceGuid.String(),
 				State:        models.LRPStartAuctionStatePending,
-				Index:        index,
+				Index:        lrpIndex,
 
 				MemoryMB: desireAppMessage.MemoryMB,
 				DiskMB:   desireAppMessage.DiskMB,
@@ -210,6 +211,20 @@ func (h Handler) Start() {
 		}
 
 		// 8<--------------------------------------------------------------------------
+
+		lrpIndex := 0
+
+		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
+		if err != nil {
+			h.logger.Warnd(
+				map[string]interface{}{
+					"error": err.Error(),
+				},
+				"handler.constructing-env.failed",
+			)
+
+			return
+		}
 
 		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
 			Guid:  lrpGuid,
