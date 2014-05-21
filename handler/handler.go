@@ -215,65 +215,6 @@ func (h Handler) Start() {
 				h.logger.Errorf("Error writing to BBS: %s", err.Error())
 			}
 		}
-
-		// 8<--------------------------------------------------------------------------
-
-		lrpIndex := 0
-
-		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
-		if err != nil {
-			h.logger.Warnd(
-				map[string]interface{}{
-					"error": err.Error(),
-				},
-				"handler.constructing-env.failed",
-			)
-
-			return
-		}
-
-		err = h.bbs.DesireTransitionalLongRunningProcess(models.TransitionalLongRunningProcess{
-			Guid:  lrpGuid,
-			State: models.TransitionalLRPStateDesired,
-
-			MemoryMB: desireAppMessage.MemoryMB,
-			DiskMB:   desireAppMessage.DiskMB,
-
-			Stack: desireAppMessage.Stack,
-			Log: models.LogConfig{
-				Guid:       desireAppMessage.AppId,
-				SourceName: "App",
-				Index:      &lrpIndex,
-			},
-			Actions: []models.ExecutorAction{
-				{
-					Action: models.DownloadAction{
-						From:     desireAppMessage.DropletUri,
-						To:       ".",
-						Extract:  true,
-						CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
-					},
-				},
-				{
-					Action: models.RunAction{
-						Script: strings.Join([]string{
-							"cd ./app",
-							"if [ -d .profile.d ]; then source .profile.d/*.sh; fi",
-							desireAppMessage.StartCommand,
-						}, " && "),
-						Env:     lrpEnv,
-						Timeout: 0,
-						ResourceLimits: models.ResourceLimits{
-							Nofile: numFiles,
-						},
-					},
-				},
-			},
-		})
-
-		if err != nil {
-			h.logger.Errorf("Error writing to BBS: %s", err.Error())
-		}
 	})
 }
 

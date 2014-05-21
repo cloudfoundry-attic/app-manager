@@ -90,10 +90,6 @@ var _ = Describe("Main", func() {
 				`))
 			})
 
-			It("desires a long running process in the BBS", func() {
-				Eventually(bbs.GetAllTransitionalLongRunningProcesses, 0.5).Should(HaveLen(1))
-			})
-
 			It("desires N start auctions in the BBS", func() {
 				Eventually(bbs.GetAllLRPStartAuctions, 0.5).Should(HaveLen(3))
 			})
