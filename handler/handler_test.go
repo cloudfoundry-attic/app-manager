@@ -62,6 +62,7 @@ var _ = Describe("Inbox", func() {
 			DiskMB:          512,
 			FileDescriptors: 32,
 			NumInstances:    2,
+			Routes:          []string{"route1", "route2"},
 		}
 	})
 
@@ -93,6 +94,7 @@ var _ = Describe("Inbox", func() {
 						MemoryMB:    128,
 						DiskMB:      512,
 						Stack:       "some-stack",
+						Routes:      []string{"route1", "route2"},
 					}))
 				})
 

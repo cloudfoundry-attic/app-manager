@@ -60,6 +60,7 @@ func (h Handler) Start() {
 			MemoryMB:    desireAppMessage.MemoryMB,
 			DiskMB:      desireAppMessage.DiskMB,
 			Stack:       desireAppMessage.Stack,
+			Routes:      desireAppMessage.Routes,
 		}
 
 		err = h.bbs.DesireLongRunningProcess(desiredLRP)
