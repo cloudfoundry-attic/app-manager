@@ -55,6 +55,26 @@ func (h Handler) Start() {
 		lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
 		lrpIndex := 0
 
+		desiredLRP := models.DesiredLRP{
+			ProcessGuid: lrpGuid,
+			Instances:   desireAppMessage.NumInstances,
+			MemoryMB:    desireAppMessage.MemoryMB,
+			DiskMB:      desireAppMessage.DiskMB,
+			Stack:       desireAppMessage.Stack,
+		}
+
+		err = h.bbs.DesireLongRunningProcess(desiredLRP)
+		if err != nil {
+			h.logger.Errord(
+				map[string]interface{}{
+					"error": err.Error(),
+				},
+				"app-manager.desire-lrp.failed",
+			)
+
+			return
+		}
+
 		var numFiles *uint64
 		if desireAppMessage.FileDescriptors != 0 {
 			numFiles = &desireAppMessage.FileDescriptors

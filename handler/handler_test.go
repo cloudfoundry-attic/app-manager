@@ -85,6 +85,17 @@ var _ = Describe("Inbox", func() {
 					}
 				})
 
+				It("marks the LRP desired in the bbs", func() {
+					desired := bbs.DesiredLRPs()
+					Ω(desired).Should(ContainElement(models.DesiredLRP{
+						ProcessGuid: "the-app-guid-the-app-version",
+						Instances:   2,
+						MemoryMB:    128,
+						DiskMB:      512,
+						Stack:       "some-stack",
+					}))
+				})
+
 				It("puts a LRPStartAuction in the bbs", func() {
 					startAuctions := bbs.GetLRPStartAuctions()
 					Ω(startAuctions).Should(HaveLen(2))
@@ -201,6 +212,17 @@ var _ = Describe("Inbox", func() {
 					Ω(firstStartAuction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
 
 					Ω(secondStartAuction.Index).Should(Equal(1))
+				})
+
+				Context("when marking the LRP as desired fails", func() {
+					BeforeEach(func() {
+						bbs.DesireLRPErr = errors.New("oh no!")
+					})
+
+					It("does not put a LRPStartAuction in the bbs", func() {
+						startAuctions := bbs.GetLRPStartAuctions()
+						Ω(startAuctions).Should(BeEmpty())
+					})
 				})
 			})
 
