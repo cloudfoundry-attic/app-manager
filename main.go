@@ -5,9 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	steno "github.com/cloudfoundry/gosteno"
@@ -16,6 +14,7 @@ import (
 	"github.com/cloudfoundry/storeadapter/workerpool"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/sigmon"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
 )
@@ -79,25 +78,17 @@ func main() {
 
 	logger.Infof("app_manager.started")
 
-	sigChan := make(chan os.Signal, 1)
+	monitor := ifrit.Envoke(sigmon.New(appManager))
 
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	err = <-monitor.Wait()
 
-	for {
-		select {
-		case sig := <-sigChan:
-			appManager.Signal(sig)
-		case err := <-appManager.Wait():
-			if err != nil {
-				logger.Errord(map[string]interface{}{
-					"error": err.Error(),
-				}, "app_manager.exited")
-				return
-			}
-			logger.Infof("app_manager.exited")
-			return
-		}
+	if err != nil {
+		logger.Errord(map[string]interface{}{
+			"error": err.Error(),
+		}, "app_manager.exited")
+		return
 	}
+	logger.Infof("app_manager.exited")
 }
 
 func initializeLogger() *steno.Logger {
