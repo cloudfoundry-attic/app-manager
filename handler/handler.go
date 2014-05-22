@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
@@ -182,7 +183,11 @@ func (h Handler) Start() {
 					models.Parallel(
 						models.ExecutorAction{
 							models.RunAction{
-								Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
+								Script: strings.Join([]string{
+									"cd ./app",
+									"if [ -d .profile.d ]; then source .profile.d/*.sh; fi",
+									desireAppMessage.StartCommand,
+								}, " && "),
 								Env:     lrpEnv,
 								Timeout: 0,
 								ResourceLimits: models.ResourceLimits{
@@ -251,7 +256,11 @@ func (h Handler) Start() {
 				},
 				{
 					Action: models.RunAction{
-						Script:  fmt.Sprintf("cd ./app && %s", desireAppMessage.StartCommand),
+						Script: strings.Join([]string{
+							"cd ./app",
+							"if [ -d .profile.d ]; then source .profile.d/*.sh; fi",
+							desireAppMessage.StartCommand,
+						}, " && "),
 						Env:     lrpEnv,
 						Timeout: 0,
 						ResourceLimits: models.ResourceLimits{

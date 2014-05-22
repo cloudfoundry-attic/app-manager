@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
 	. "github.com/cloudfoundry-incubator/app-manager/handler"
 	"github.com/cloudfoundry-incubator/runtime-schema/bbs/fake_bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/storeadapter"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
+
+	"regexp"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -154,7 +158,15 @@ var _ = Describe("Inbox", func() {
 						URL:    "http://" + repAddrRelativeToExecutor + "/lrp_running/the-app-guid-the-app-version/0/" + firstStartAuction.InstanceGuid,
 					}))
 
-					Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
+					Ω(runAction.Script).Should(Equal(stripWhitespace(`
+						cd ./app &&
+						if [ -d .profile.d ];
+						then
+							source .profile.d/*.sh;
+						fi &&
+						the-start-command
+					`)))
+
 					Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
 						Nofile: &numFiles,
 					}))
@@ -351,7 +363,13 @@ var _ = Describe("Inbox", func() {
 				runAction, ok := lrp.Actions[1].Action.(models.RunAction)
 				Ω(ok).Should(BeTrue())
 
-				Ω(runAction.Script).Should(Equal("cd ./app && the-start-command"))
+				Ω(runAction.Script).Should(Equal(stripWhitespace(`
+					cd ./app &&
+					if [ -d .profile.d ]; then
+						source .profile.d/*.sh;
+					fi &&
+					the-start-command
+			  `)))
 				Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
 					Nofile: &numFiles,
 				}))
@@ -448,3 +466,8 @@ var _ = Describe("Inbox", func() {
 		})
 	})
 })
+
+func stripWhitespace(input string) string {
+	whitespaceRegexp := regexp.MustCompile("\\s+")
+	return strings.TrimSpace(whitespaceRegexp.ReplaceAllString(input, " "))
+}
