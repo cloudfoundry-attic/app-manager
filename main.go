@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"log"
 	"os"
 	"strings"
 
@@ -71,24 +70,23 @@ func main() {
 	var healthCheckDownloadURLs map[string]string
 	err := json.Unmarshal([]byte(*healthChecks), &healthCheckDownloadURLs)
 	if err != nil {
-		log.Fatalln("invalid health checks:", err)
+		logger.Fatalf("invalid health checks: %s\n", err)
 	}
 
 	appManager := ifrit.Envoke(handler.NewHandler(*repAddrRelativeToExecutor, healthCheckDownloadURLs, natsClient, bbs, logger))
 
-	logger.Infof("app_manager.started")
+	logger.Info("app_manager.started")
 
 	monitor := ifrit.Envoke(sigmon.New(appManager))
 
 	err = <-monitor.Wait()
-
 	if err != nil {
 		logger.Errord(map[string]interface{}{
 			"error": err.Error(),
 		}, "app_manager.exited")
-		return
+		os.Exit(1)
 	}
-	logger.Infof("app_manager.exited")
+	logger.Info("app_manager.exited")
 }
 
 func initializeLogger() *steno.Logger {
