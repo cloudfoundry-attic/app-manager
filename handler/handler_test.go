@@ -150,7 +150,7 @@ var _ = Describe("Inbox", func() {
 					Ω(ok).Should(BeTrue())
 
 					Ω(monitorAction.Action.Action).Should(Equal(models.RunAction{
-						Script: "/tmp/diego-health-check -addr=:8080",
+						Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
 					}))
 
 					Ω(monitorAction.HealthyHook).Should(Equal(models.HealthRequest{

@@ -199,7 +199,7 @@ func (h Handler) Start() {
 							models.MonitorAction{
 								Action: models.ExecutorAction{
 									models.RunAction{
-										Script: "/tmp/diego-health-check -addr=:8080",
+										Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
 									},
 								},
 								HealthyHook: models.HealthRequest{
