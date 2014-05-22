@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
+	"sync"
 
 	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
@@ -17,6 +19,8 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"github.com/tedsuo/router"
 )
+
+const DesireAppTopic = "diego.desire.app"
 
 var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
 
@@ -44,8 +48,212 @@ func NewHandler(
 	}
 }
 
-func (h Handler) Start() {
-	h.natsClient.Subscribe("diego.desire.app", func(message *yagnats.Message) {
+func (h Handler) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
+	wg := new(sync.WaitGroup)
+	desiredApps := make(chan models.DesireAppRequestFromCC)
+	h.listenForDesiredApps(desiredApps)
+
+	close(ready)
+
+	for {
+		select {
+		case msg := <-desiredApps:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				h.desireApp(msg)
+			}()
+		case <-signals:
+			h.natsClient.UnsubscribeAll(DesireAppTopic)
+			wg.Wait()
+			return nil
+		}
+	}
+}
+
+func (h Handler) listenForDesiredApps(desiredApps chan models.DesireAppRequestFromCC) {
+	h.natsClient.Subscribe(DesireAppTopic, func(message *yagnats.Message) {
+		desireAppMessage := models.DesireAppRequestFromCC{}
+		err := json.Unmarshal(message.Payload, &desireAppMessage)
+		if err != nil {
+			h.logger.Errorf("Failed to parse NATS message.")
+			return
+		}
+
+		desiredApps <- desireAppMessage
+	})
+}
+
+func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
+
+	lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
+
+	desiredLRP := models.DesiredLRP{
+		ProcessGuid: lrpGuid,
+		Instances:   desireAppMessage.NumInstances,
+		MemoryMB:    desireAppMessage.MemoryMB,
+		DiskMB:      desireAppMessage.DiskMB,
+		Stack:       desireAppMessage.Stack,
+		Routes:      desireAppMessage.Routes,
+	}
+
+	err := h.bbs.DesireLongRunningProcess(desiredLRP)
+	if err != nil {
+		h.logger.Errord(
+			map[string]interface{}{
+				"error": err.Error(),
+			},
+			"app-manager.desire-lrp.failed",
+		)
+
+		return
+	}
+
+	var numFiles *uint64
+	if desireAppMessage.FileDescriptors != 0 {
+		numFiles = &desireAppMessage.FileDescriptors
+	}
+
+	fileServerURL, err := h.bbs.GetAvailableFileServer()
+	if err != nil {
+		h.logger.Warnd(
+			map[string]interface{}{
+				"error": err.Error(),
+			},
+			"handler.get-available-file-server.failed",
+		)
+
+		return
+	}
+
+	healthCheckURL, err := h.healthCheckDownloadURL(desireAppMessage.Stack, fileServerURL)
+	if err != nil {
+		h.logger.Warnd(
+			map[string]interface{}{
+				"error": err.Error(),
+				"stack": desireAppMessage.Stack,
+			},
+			"handler.construct-health-check-download-url.failed",
+		)
+
+		return
+	}
+
+	repRequests := router.NewRequestGenerator(
+		"http://"+h.repAddrRelativeToExecutor,
+		RepRoutes.Routes,
+	)
+
+	for index := 0; index < desireAppMessage.NumInstances; index++ {
+		lrpIndex := index
+
+		instanceGuid, err := uuid.NewV4()
+		if err != nil {
+			h.logger.Errorf("Error generating instance guid: %s", err.Error())
+			continue
+		}
+
+		lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
+		if err != nil {
+			h.logger.Warnd(
+				map[string]interface{}{
+					"error": err.Error(),
+				},
+				"handler.constructing-env.failed",
+			)
+
+			return
+		}
+
+		healthyHook, err := repRequests.RequestForHandler(
+			RepRoutes.LRPRunning,
+			router.Params{
+				"process_guid":  lrpGuid,
+				"index":         fmt.Sprintf("%d", lrpIndex),
+				"instance_guid": instanceGuid.String(),
+			},
+			nil,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
+			Guid:         lrpGuid,
+			InstanceGuid: instanceGuid.String(),
+			State:        models.LRPStartAuctionStatePending,
+			Index:        lrpIndex,
+
+			MemoryMB: desireAppMessage.MemoryMB,
+			DiskMB:   desireAppMessage.DiskMB,
+
+			Ports: []models.PortMapping{
+				{ContainerPort: 8080},
+			},
+
+			Stack: desireAppMessage.Stack,
+			Log: models.LogConfig{
+				Guid:       desireAppMessage.AppId,
+				SourceName: "App",
+				Index:      &lrpIndex,
+			},
+			Actions: []models.ExecutorAction{
+				{
+					Action: models.DownloadAction{
+						From:    healthCheckURL.String(),
+						To:      "/tmp/diego-health-check",
+						Extract: true,
+					},
+				},
+				{
+					Action: models.DownloadAction{
+						From:     desireAppMessage.DropletUri,
+						To:       ".",
+						Extract:  true,
+						CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
+					},
+				},
+				models.Parallel(
+					models.ExecutorAction{
+						models.RunAction{
+							Script: strings.Join([]string{
+								"cd ./app",
+								"if [ -d .profile.d ]; then source .profile.d/*.sh; fi",
+								desireAppMessage.StartCommand,
+							}, " && "),
+							Env:     lrpEnv,
+							Timeout: 0,
+							ResourceLimits: models.ResourceLimits{
+								Nofile: numFiles,
+							},
+						},
+					},
+					models.ExecutorAction{
+						models.MonitorAction{
+							Action: models.ExecutorAction{
+								models.RunAction{
+									Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
+								},
+							},
+							HealthyThreshold:   1,
+							UnhealthyThreshold: 1,
+							HealthyHook: models.HealthRequest{
+								Method: healthyHook.Method,
+								URL:    healthyHook.URL.String(),
+							},
+						},
+					},
+				),
+			},
+		})
+		if err != nil {
+			h.logger.Errorf("Error writing to BBS: %s", err.Error())
+		}
+	}
+}
+
+func (h Handler) start() {
+	h.natsClient.Subscribe(DesireAppTopic, func(message *yagnats.Message) {
 		desireAppMessage := models.DesireAppRequestFromCC{}
 		err := json.Unmarshal(message.Payload, &desireAppMessage)
 		if err != nil {

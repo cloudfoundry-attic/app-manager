@@ -5,7 +5,9 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	steno "github.com/cloudfoundry/gosteno"
@@ -13,6 +15,7 @@ import (
 	"github.com/cloudfoundry/storeadapter/etcdstoreadapter"
 	"github.com/cloudfoundry/storeadapter/workerpool"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/tedsuo/ifrit"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
 )
@@ -72,11 +75,29 @@ func main() {
 		log.Fatalln("invalid health checks:", err)
 	}
 
-	handler.NewHandler(*repAddrRelativeToExecutor, healthCheckDownloadURLs, natsClient, bbs, logger).Start()
+	appManager := ifrit.Envoke(handler.NewHandler(*repAddrRelativeToExecutor, healthCheckDownloadURLs, natsClient, bbs, logger))
 
 	logger.Infof("app_manager.started")
 
-	select {}
+	sigChan := make(chan os.Signal, 1)
+
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case sig := <-sigChan:
+			appManager.Signal(sig)
+		case err := <-appManager.Wait():
+			if err != nil {
+				logger.Errord(map[string]interface{}{
+					"error": err.Error(),
+				}, "app_manager.exited")
+				return
+			}
+			logger.Infof("app_manager.exited")
+			return
+		}
+	}
 }
 
 func initializeLogger() *steno.Logger {
