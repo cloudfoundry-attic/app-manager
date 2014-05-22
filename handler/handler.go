@@ -202,6 +202,8 @@ func (h Handler) Start() {
 										Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
 									},
 								},
+								HealthyThreshold:   1,
+								UnhealthyThreshold: 1,
 								HealthyHook: models.HealthRequest{
 									Method: healthyHook.Method,
 									URL:    healthyHook.URL.String(),

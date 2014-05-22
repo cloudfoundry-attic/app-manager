@@ -158,6 +158,9 @@ var _ = Describe("Inbox", func() {
 						URL:    "http://" + repAddrRelativeToExecutor + "/lrp_running/the-app-guid-the-app-version/0/" + firstStartAuction.InstanceGuid,
 					}))
 
+					Ω(monitorAction.HealthyThreshold).ShouldNot(BeZero())
+					Ω(monitorAction.UnhealthyThreshold).ShouldNot(BeZero())
+
 					Ω(runAction.Script).Should(Equal(stripWhitespace(`
 						cd ./app &&
 						if [ -d .profile.d ];
