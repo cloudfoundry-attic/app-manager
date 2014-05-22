@@ -11,19 +11,19 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/rep/routes",
-			"Rev": "e2502b73c5ffbf947f62e5d136ba66f708f280b8"
+			"Rev": "46fdf0f4d741f17e5c18904c9f49c23f29b19ac6"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "f4ccd84ffb364e6d27e30d9e0677729986b94dcc"
+			"Rev": "c841d6a44bd454e5a97a5b05a9833c979b4affc3"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "f4ccd84ffb364e6d27e30d9e0677729986b94dcc"
+			"Rev": "c841d6a44bd454e5a97a5b05a9833c979b4affc3"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/router",
-			"Rev": "f4ccd84ffb364e6d27e30d9e0677729986b94dcc"
+			"Rev": "c841d6a44bd454e5a97a5b05a9833c979b4affc3"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -32,15 +32,15 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
+			"Rev": "7961fb4a446e96ef5a35fee37aa4b4945dca6745"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/timeprovider",
-			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
+			"Rev": "7961fb4a446e96ef5a35fee37aa4b4945dca6745"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/urljoiner",
-			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
+			"Rev": "7961fb4a446e96ef5a35fee37aa4b4945dca6745"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/storeadapter",
@@ -66,6 +66,10 @@
 		{
 			"ImportPath": "github.com/onsi/gomega",
 			"Rev": "f5533d435ebfcf4fa0463202dc0e966b983618b8"
+		},
+		{
+			"ImportPath": "github.com/tedsuo/ifrit",
+			"Rev": "39b8207aaa480dfc37d459016dd8a214eb41135d"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/router",

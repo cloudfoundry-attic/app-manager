@@ -179,7 +179,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		}
 
 		err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
-			Guid:         lrpGuid,
+			ProcessGuid:  lrpGuid,
 			InstanceGuid: instanceGuid.String(),
 			State:        models.LRPStartAuctionStatePending,
 			Index:        lrpIndex,
@@ -354,7 +354,7 @@ func (h Handler) start() {
 			}
 
 			err = h.bbs.RequestLRPStartAuction(models.LRPStartAuction{
-				Guid:         lrpGuid,
+				ProcessGuid:  lrpGuid,
 				InstanceGuid: instanceGuid.String(),
 				State:        models.LRPStartAuctionStatePending,
 				Index:        lrpIndex,

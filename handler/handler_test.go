@@ -114,7 +114,7 @@ var _ = Describe("Handler", func() {
 				firstStartAuction := startAuctions[0]
 
 				Ω(firstStartAuction.Index).Should(Equal(0))
-				Ω(firstStartAuction.Guid).Should(Equal("the-app-guid-the-app-version"))
+				Ω(firstStartAuction.ProcessGuid).Should(Equal("the-app-guid-the-app-version"))
 				Ω(firstStartAuction.InstanceGuid).ShouldNot(BeEmpty())
 				Ω(firstStartAuction.Stack).Should(Equal("some-stack"))
 				Ω(firstStartAuction.State).Should(Equal(models.LRPStartAuctionStatePending))
@@ -217,7 +217,7 @@ var _ = Describe("Handler", func() {
 						"port":             8080,
 						"instance_id":      "%s",
 						"instance_index":   %d
-					}`, firstStartAuction.Guid, *firstStartAuction.Log.Index)))
+					}`, firstStartAuction.ProcessGuid, *firstStartAuction.Log.Index)))
 
 				secondStartAuction := startAuctions[1]
 				Ω(secondStartAuction.Index).Should(Equal(1))
