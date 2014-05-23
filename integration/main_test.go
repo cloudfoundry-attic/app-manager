@@ -58,6 +58,7 @@ var _ = Describe("Main", func() {
 			[]string{fmt.Sprintf("http://127.0.0.1:%d", etcdPort)},
 			[]string{fmt.Sprintf("127.0.0.1:%d", natsPort)},
 			map[string]string{"some-stack": "some-health-check.tar.gz"},
+			"127.0.0.1:20515",
 		)
 	})
 
