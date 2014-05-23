@@ -11,19 +11,19 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/rep/routes",
-			"Rev": "52052338b31c0cdde26ace6e34c3778832e50f1c"
+			"Rev": "0167bdbbdd7826c94bef11bc5b127849952deb84"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "7bfb9ab8320cd12e7c8c6ef11b82ef65a1da237f"
+			"Rev": "89f8d3b9af9e15729c19bd05137a0691c8fca5a8"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "7bfb9ab8320cd12e7c8c6ef11b82ef65a1da237f"
+			"Rev": "89f8d3b9af9e15729c19bd05137a0691c8fca5a8"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/router",
-			"Rev": "7bfb9ab8320cd12e7c8c6ef11b82ef65a1da237f"
+			"Rev": "89f8d3b9af9e15729c19bd05137a0691c8fca5a8"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -65,7 +65,7 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Rev": "31890964f058d62158db8efe8ccd6cb55a5ecd6d"
+			"Rev": "f5533d435ebfcf4fa0463202dc0e966b983618b8"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",

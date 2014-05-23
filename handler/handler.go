@@ -97,7 +97,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		Routes:      desireAppMessage.Routes,
 	}
 
-	err := h.bbs.DesireLongRunningProcess(desiredLRP)
+	err := h.bbs.DesireLRP(desiredLRP)
 	if err != nil {
 		h.logger.Errord(
 			map[string]interface{}{
