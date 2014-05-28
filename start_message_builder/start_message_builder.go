@@ -181,6 +181,7 @@ func (b StartMessageBuilder) healthCheckDownloadURL(stack string, fileServerURL 
 }
 
 func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int) ([]models.EnvironmentVariable, error) {
+	env = append(env, models.EnvironmentVariable{Key: "HOME", Value: "/app"})
 	env = append(env, models.EnvironmentVariable{Key: "PORT", Value: "8080"})
 	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_PORT", Value: "8080"})
 	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_HOST", Value: "0.0.0.0"})

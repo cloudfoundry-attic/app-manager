@@ -123,6 +123,11 @@ var _ = Describe("Start Message Builder", func() {
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
+			Key:   "HOME",
+			Value: "/app",
+		}))
+
+		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 			Key:   "PORT",
 			Value: "8080",
 		}))
