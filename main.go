@@ -140,5 +140,5 @@ func initializeBbs(logger *steno.Logger) Bbs.AppManagerBBS {
 		logger.Fatalf("Error connecting to etcd: %s\n", err)
 	}
 
-	return Bbs.NewAppManagerBBS(etcdAdapter, timeprovider.NewTimeProvider())
+	return Bbs.NewAppManagerBBS(etcdAdapter, timeprovider.NewTimeProvider(), logger)
 }

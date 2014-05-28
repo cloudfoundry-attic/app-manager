@@ -7,6 +7,7 @@ import (
 	"github.com/cloudfoundry-incubator/app-manager/integration/app_manager_runner"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
+	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/timeprovider"
 	"github.com/cloudfoundry/yagnats"
 
@@ -22,7 +23,17 @@ var _ = Describe("Starting apps", func() {
 
 	BeforeEach(func() {
 		natsClient = natsRunner.MessageBus
-		bbs = Bbs.NewBBS(etcdRunner.Adapter(), timeprovider.NewTimeProvider())
+
+		logSink := steno.NewTestingSink()
+
+		steno.Init(&steno.Config{
+			Sinks: []steno.Sink{logSink},
+		})
+
+		logger := steno.NewLogger("the-logger")
+		steno.EnterTestMode()
+
+		bbs = Bbs.NewBBS(etcdRunner.Adapter(), timeprovider.NewTimeProvider(), logger)
 
 		var err error
 		var presenceStatus <-chan bool
