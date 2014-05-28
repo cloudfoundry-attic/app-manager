@@ -16,6 +16,7 @@ import (
 	"github.com/tedsuo/ifrit/sigmon"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
+	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 )
 
 var repAddrRelativeToExecutor = flag.String(
@@ -73,7 +74,8 @@ func main() {
 		logger.Fatalf("invalid health checks: %s\n", err)
 	}
 
-	appManager := ifrit.Envoke(handler.NewHandler(*repAddrRelativeToExecutor, healthCheckDownloadURLs, natsClient, bbs, logger))
+	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, healthCheckDownloadURLs, logger)
+	appManager := ifrit.Envoke(handler.NewHandler(natsClient, bbs, startMessageBuilder, logger))
 
 	logger.Info("app_manager.started")
 

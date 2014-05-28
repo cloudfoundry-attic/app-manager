@@ -22,8 +22,50 @@ import (
 var appManagerPath string
 var etcdRunner *etcdstorerunner.ETCDClusterRunner
 var natsRunner *natsrunner.NATSRunner
+var natsPort int
 var fileServerPresence services_bbs.Presence
 var runner *app_manager_runner.AppManagerRunner
+
+func TestAppManagerMain(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
+}
+
+var _ = BeforeSuite(func() {
+	var err error
+	appManagerPath, err = gexec.Build("github.com/cloudfoundry-incubator/app-manager", "-race")
+	Ω(err).ShouldNot(HaveOccurred())
+
+	etcdPort := 5001 + GinkgoParallelNode()
+	natsPort = 4001 + GinkgoParallelNode()
+
+	etcdRunner = etcdstorerunner.NewETCDClusterRunner(etcdPort, 1)
+
+	natsRunner = natsrunner.NewNATSRunner(natsPort)
+})
+
+var _ = BeforeEach(func() {
+	etcdRunner.Start()
+	natsRunner.Start()
+})
+
+var _ = AfterEach(func() {
+	etcdRunner.Stop()
+	natsRunner.Stop()
+})
+
+var _ = AfterSuite(func() {
+	gexec.CleanupBuildArtifacts()
+	if etcdRunner != nil {
+		etcdRunner.Stop()
+	}
+	if natsRunner != nil {
+		natsRunner.Stop()
+	}
+	if runner != nil {
+		runner.KillWithFire()
+	}
+})
 
 var _ = Describe("Main", func() {
 	var (
@@ -32,15 +74,6 @@ var _ = Describe("Main", func() {
 	)
 
 	BeforeEach(func() {
-		etcdPort := 5001 + GinkgoParallelNode()
-		natsPort := 4001 + GinkgoParallelNode()
-
-		etcdRunner = etcdstorerunner.NewETCDClusterRunner(etcdPort, 1)
-		etcdRunner.Start()
-
-		natsRunner = natsrunner.NewNATSRunner(natsPort)
-		natsRunner.Start()
-
 		natsClient = natsRunner.MessageBus
 
 		bbs = Bbs.NewBBS(etcdRunner.Adapter(), timeprovider.NewTimeProvider())
@@ -55,23 +88,21 @@ var _ = Describe("Main", func() {
 
 		runner = app_manager_runner.New(
 			appManagerPath,
-			[]string{fmt.Sprintf("http://127.0.0.1:%d", etcdPort)},
+			etcdRunner.NodeURLS(),
 			[]string{fmt.Sprintf("127.0.0.1:%d", natsPort)},
 			map[string]string{"some-stack": "some-health-check.tar.gz"},
 			"127.0.0.1:20515",
 		)
 	})
 
-	AfterEach(func() {
-		runner.KillWithFire()
-		etcdRunner.Stop()
-		natsRunner.Stop()
-		fileServerPresence.Remove()
-	})
-
 	Context("when started", func() {
 		BeforeEach(func() {
 			runner.Start()
+		})
+
+		AfterEach(func() {
+			runner.KillWithFire()
+			fileServerPresence.Remove()
 		})
 
 		Describe("when a 'diego.desire.app' message is recieved", func() {
@@ -96,28 +127,4 @@ var _ = Describe("Main", func() {
 			})
 		})
 	})
-})
-
-func TestAppManagerMain(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Integration Suite")
-}
-
-var _ = BeforeSuite(func() {
-	var err error
-	appManagerPath, err = gexec.Build("github.com/cloudfoundry-incubator/app-manager", "-race")
-	Ω(err).ShouldNot(HaveOccurred())
-})
-
-var _ = AfterSuite(func() {
-	gexec.CleanupBuildArtifacts()
-	if etcdRunner != nil {
-		etcdRunner.Stop()
-	}
-	if natsRunner != nil {
-		natsRunner.Stop()
-	}
-	if runner != nil {
-		runner.KillWithFire()
-	}
 })
