@@ -61,15 +61,16 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Rev": "a2498a3b8773b7b373ac8aa8fd774f2488a54590"
+			"Comment": "v1.0.0-2-g4cf6831",
+			"Rev": "4cf683101c36426dc975f4db4d7f01d9c071f31a"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Rev": "31890964f058d62158db8efe8ccd6cb55a5ecd6d"
+			"Rev": "50bea9a608004800126b3fddab0c3608d87c0ca9"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",
-			"Rev": "28e5a1d991b72ee764526ec08f53e757ed214784"
+			"Rev": "f02dc8a87f9898bcaf8aae82d92954a6d5eb7717"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/router",
