@@ -76,7 +76,6 @@ func (h Handler) listenForDesiredApps(desiredApps chan models.DesireAppRequestFr
 }
 
 func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
-
 	lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
 
 	desiredLRP := models.DesiredLRP{
