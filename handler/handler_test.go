@@ -174,6 +174,47 @@ var _ = Describe("Handler", func() {
 				Ω(logSink.Records()[0].Message).Should(ContainSubstring("handler.request-start-auction.failed"))
 			})
 		})
+
+		Context("when there is an error fetching the actual instances", func() {
+			BeforeEach(func() {
+				bbs.ActualLRPsErr = errors.New("connection error")
+			})
+
+			It("does not put a LRPStartAuction in the bbs", func() {
+				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
+			})
+		})
+
+		Context("when there are already instances running for the desired app", func() {
+			BeforeEach(func() {
+				desireAppRequest.NumInstances = 4
+				bbs.Lock()
+				bbs.ActualLRPs = []models.LRP{
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "a",
+						Index:        0,
+						State:        models.LRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "b",
+						Index:        4,
+						State:        models.LRPStateRunning,
+					},
+				}
+				bbs.Unlock()
+			})
+
+			It("only starts missing ones", func() {
+				Eventually(bbs.GetLRPStartAuctions).Should(HaveLen(3))
+				startAuctions := bbs.GetLRPStartAuctions()
+
+				Ω(startAuctions[0].Index).Should(Equal(1))
+				Ω(startAuctions[1].Index).Should(Equal(2))
+				Ω(startAuctions[2].Index).Should(Equal(3))
+			})
+		})
 	})
 
 	Describe("when a invalid 'diego.desire.app' message is received", func() {

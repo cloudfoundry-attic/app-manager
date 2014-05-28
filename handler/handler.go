@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/cloudfoundry-incubator/app-manager/delta_force"
 	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
@@ -113,13 +114,24 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		return
 	}
 
-	for index := 0; index < desireAppMessage.NumInstances; index++ {
-		startMessage, err := h.startMessageBuilder.Build(desireAppMessage, index, fileServerURL)
+	actualInstances, err := h.actualsForProcessGuid(lrpGuid)
+	if err != nil {
+		h.logger.Errord(map[string]interface{}{
+			"desired-app-message": desireAppMessage,
+			"error":               err,
+		}, "handler.fetch-actuals.failed")
+		return
+	}
+
+	delta := delta_force.Reconcile(desireAppMessage.NumInstances, actualInstances)
+
+	for _, lrpIndex := range delta.IndicesToStart {
+		startMessage, err := h.startMessageBuilder.Build(desireAppMessage, lrpIndex, fileServerURL)
 
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desireAppMessage,
-				"index":               index,
+				"index":               lrpIndex,
 				"error":               err,
 			}, "handler.build-start-message.failed")
 			continue
@@ -129,9 +141,24 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desireAppMessage,
-				"index":               index,
+				"index":               lrpIndex,
 				"error":               err,
 			}, "handler.request-start-auction.failed")
 		}
 	}
+}
+
+func (h Handler) actualsForProcessGuid(lrpGuid string) (delta_force.ActualInstances, error) {
+	actualInstances := delta_force.ActualInstances{}
+	actualLRPs, err := h.bbs.GetActualLRPsByProcessGuid(lrpGuid)
+
+	if err != nil {
+		return actualInstances, err
+	}
+
+	for _, actualLRP := range actualLRPs {
+		actualInstances = append(actualInstances, delta_force.ActualInstance{actualLRP.Index, actualLRP.InstanceGuid})
+	}
+
+	return actualInstances, err
 }
