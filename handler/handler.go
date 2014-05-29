@@ -126,6 +126,10 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 	delta := delta_force.Reconcile(desireAppMessage.NumInstances, actualInstances)
 
 	for _, lrpIndex := range delta.IndicesToStart {
+		h.logger.Infod(map[string]interface{}{
+			"desired-app-message": desireAppMessage,
+			"index":               lrpIndex,
+		}, "handler.request-start")
 		startMessage, err := h.startMessageBuilder.Build(desireAppMessage, lrpIndex, fileServerURL)
 
 		if err != nil {
@@ -144,6 +148,21 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 				"index":               lrpIndex,
 				"error":               err,
 			}, "handler.request-start-auction.failed")
+		}
+	}
+
+	for _, guidToStop := range delta.GuidsToStop {
+		h.logger.Infod(map[string]interface{}{
+			"desired-app-message": desireAppMessage,
+			"stop-instance-guid":  guidToStop,
+		}, "handler.request-stop")
+		err = h.bbs.RequestStopLRPInstance(models.StopLRPInstance{InstanceGuid: guidToStop})
+		if err != nil {
+			h.logger.Errord(map[string]interface{}{
+				"desired-app-message": desireAppMessage,
+				"stop-instance-guid":  guidToStop,
+				"error":               err,
+			}, "handler.request-stop-instance.failed")
 		}
 	}
 }

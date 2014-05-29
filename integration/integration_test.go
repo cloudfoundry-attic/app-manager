@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudfoundry/storeadapter/test_helpers"
+
 	"github.com/cloudfoundry-incubator/app-manager/integration/app_manager_runner"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
@@ -43,6 +45,8 @@ var _ = Describe("Starting apps", func() {
 
 		Eventually(presenceStatus).Should(Receive(BeTrue()))
 
+		test_helpers.NewStatusReporter(presenceStatus)
+
 		runner = app_manager_runner.New(
 			appManagerPath,
 			etcdRunner.NodeURLS(),
@@ -60,7 +64,7 @@ var _ = Describe("Starting apps", func() {
 	})
 
 	Describe("when a 'diego.desire.app' message is recieved", func() {
-		BeforeEach(func() {
+		JustBeforeEach(func() {
 			natsClient.Publish("diego.desire.app", []byte(`
         {
           "app_id": "the-app-guid",
@@ -82,7 +86,7 @@ var _ = Describe("Starting apps", func() {
 			})
 		})
 
-		Context("for an app that has some instances", func() {
+		Context("for an app that is missing instances", func() {
 			BeforeEach(func() {
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
 					ProcessGuid:  "the-app-guid-the-app-version",
@@ -101,6 +105,42 @@ var _ = Describe("Starting apps", func() {
 				Ω(indices).Should(ContainElement(2))
 
 				Consistently(bbs.GetAllLRPStartAuctions).Should(HaveLen(2))
+			})
+		})
+
+		Context("for an app that has extra instances", func() {
+			BeforeEach(func() {
+				bbs.ReportActualLRPAsRunning(models.ActualLRP{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					InstanceGuid: "a",
+					Index:        0,
+				})
+
+				bbs.ReportActualLRPAsRunning(models.ActualLRP{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					InstanceGuid: "b",
+					Index:        1,
+				})
+
+				bbs.ReportActualLRPAsRunning(models.ActualLRP{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					InstanceGuid: "c",
+					Index:        2,
+				})
+
+				bbs.ReportActualLRPAsRunning(models.ActualLRP{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					InstanceGuid: "d-extra",
+					Index:        3,
+				})
+			})
+
+			It("stops the extra instances", func() {
+				Consistently(bbs.GetAllLRPStartAuctions, 0.5).Should(BeEmpty())
+				Eventually(bbs.GetAllStopLRPInstances).Should(HaveLen(1))
+				stopInstances, err := bbs.GetAllStopLRPInstances()
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(stopInstances[0].InstanceGuid).Should(Equal("d-extra"))
 			})
 		})
 	})

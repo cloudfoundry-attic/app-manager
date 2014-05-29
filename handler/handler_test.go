@@ -170,8 +170,8 @@ var _ = Describe("Handler", func() {
 			})
 
 			It("logs an error", func() {
-				Eventually(logSink.Records).Should(HaveLen(2))
-				Ω(logSink.Records()[0].Message).Should(ContainSubstring("handler.request-start-auction.failed"))
+				Eventually(logSink.Records).Should(HaveLen(4))
+				Ω(logSink.Records()[1].Message).Should(ContainSubstring("handler.request-start-auction.failed"))
 			})
 		})
 
@@ -185,7 +185,7 @@ var _ = Describe("Handler", func() {
 			})
 		})
 
-		Context("when there are already instances running for the desired app", func() {
+		Context("when there are already instances running for the desired app, but some are missing", func() {
 			BeforeEach(func() {
 				desireAppRequest.NumInstances = 4
 				bbs.Lock()
@@ -202,6 +202,12 @@ var _ = Describe("Handler", func() {
 						Index:        4,
 						State:        models.ActualLRPStateRunning,
 					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "c",
+						Index:        5,
+						State:        models.ActualLRPStateRunning,
+					},
 				}
 				bbs.Unlock()
 			})
@@ -213,6 +219,59 @@ var _ = Describe("Handler", func() {
 				Ω(startAuctions[0].Index).Should(Equal(1))
 				Ω(startAuctions[1].Index).Should(Equal(2))
 				Ω(startAuctions[2].Index).Should(Equal(3))
+			})
+
+			It("does not stop extra ones", func() {
+				Consistently(bbs.GetStopLRPInstances).Should(BeEmpty())
+			})
+		})
+
+		Context("when there are extra instanes running for the desired app", func() {
+			BeforeEach(func() {
+				desireAppRequest.NumInstances = 2
+				bbs.Lock()
+				bbs.ActualLRPs = []models.ActualLRP{
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "a",
+						Index:        0,
+						State:        models.ActualLRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "b",
+						Index:        1,
+						State:        models.ActualLRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "c",
+						Index:        2,
+						State:        models.ActualLRPStateRunning,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "d",
+						Index:        3,
+						State:        models.ActualLRPStateRunning,
+					},
+				}
+				bbs.Unlock()
+			})
+
+			It("doesn't start anything", func() {
+				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
+			})
+
+			It("stops extra ones", func() {
+				Eventually(bbs.GetStopLRPInstances).Should(HaveLen(2))
+				stopInstances := bbs.GetStopLRPInstances()
+
+				stopInstance1 := models.StopLRPInstance{InstanceGuid: "c"}
+				stopInstance2 := models.StopLRPInstance{InstanceGuid: "d"}
+
+				Ω(stopInstances).Should(ContainElement(stopInstance1))
+				Ω(stopInstances).Should(ContainElement(stopInstance2))
 			})
 		})
 	})
