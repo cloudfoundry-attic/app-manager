@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 
 	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
@@ -16,18 +15,18 @@ import (
 	"github.com/tedsuo/router"
 )
 
-var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
+var ErrNoCircusDefined = errors.New("no lifecycle binary bundle defined for stack")
 
 type StartMessageBuilder struct {
 	repAddrRelativeToExecutor string
 	logger                    *steno.Logger
-	healthChecks              map[string]string
+	circuses                  map[string]string
 }
 
-func New(repAddrRelativeToExecutor string, healthChecks map[string]string, logger *steno.Logger) *StartMessageBuilder {
+func New(repAddrRelativeToExecutor string, circuses map[string]string, logger *steno.Logger) *StartMessageBuilder {
 	return &StartMessageBuilder{
 		repAddrRelativeToExecutor: repAddrRelativeToExecutor,
-		healthChecks:              healthChecks,
+		circuses:                  circuses,
 		logger:                    logger,
 	}
 }
@@ -41,14 +40,14 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 		return models.LRPStartAuction{}, err
 	}
 
-	healthCheckURL, err := b.healthCheckDownloadURL(desireAppMessage.Stack, fileServerURL)
+	circusURL, err := b.circusDownloadURL(desireAppMessage.Stack, fileServerURL)
 	if err != nil {
 		b.logger.Warnd(
 			map[string]interface{}{
 				"error": err.Error(),
 				"stack": desireAppMessage.Stack,
 			},
-			"handler.construct-health-check-download-url.failed",
+			"handler.construct-circus-download-url.failed",
 		)
 
 		return models.LRPStartAuction{}, err
@@ -111,8 +110,8 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 		Actions: []models.ExecutorAction{
 			{
 				Action: models.DownloadAction{
-					From:    healthCheckURL.String(),
-					To:      "/tmp/diego-health-check",
+					From:    circusURL.String(),
+					To:      "/tmp/circus",
 					Extract: true,
 				},
 			},
@@ -127,11 +126,7 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 			models.Parallel(
 				models.ExecutorAction{
 					models.RunAction{
-						Script: strings.Join([]string{
-							"cd ./app",
-							"if [ -d .profile.d ]; then source .profile.d/*.sh; fi",
-							desireAppMessage.StartCommand,
-						}, " && "),
+						Script:  "/tmp/circus/soldier /app " + desireAppMessage.StartCommand,
 						Env:     lrpEnv,
 						Timeout: 0,
 						ResourceLimits: models.ResourceLimits{
@@ -143,7 +138,7 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 					models.MonitorAction{
 						Action: models.ExecutorAction{
 							models.RunAction{
-								Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
+								Script: "/tmp/circus/spy -addr=:8080",
 							},
 						},
 						HealthyThreshold:   1,
@@ -159,33 +154,31 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 	}, nil
 }
 
-func (b StartMessageBuilder) healthCheckDownloadURL(stack string, fileServerURL string) (*url.URL, error) {
-	checkPath, ok := b.healthChecks[stack]
+func (b StartMessageBuilder) circusDownloadURL(stack string, fileServerURL string) (*url.URL, error) {
+	checkPath, ok := b.circuses[stack]
 	if !ok {
-		return nil, ErrNoHealthCheckDefined
+		return nil, ErrNoCircusDefined
 	}
 
 	staticRoute, ok := SchemaRouter.NewFileServerRoutes().RouteForHandler(SchemaRouter.FS_STATIC)
 	if !ok {
-		return nil, errors.New("couldn't generate the compiler download path")
+		return nil, errors.New("couldn't generate the download path for the bundle of app lifecycle binaries")
 	}
 
 	urlString := urljoiner.Join(fileServerURL, staticRoute.Path, checkPath)
 
 	url, err := url.ParseRequestURI(urlString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse compiler download URL: %s", err)
+		return nil, fmt.Errorf("failed to parse download URL for app lifecycle binary bundle: %s", err)
 	}
 
 	return url, nil
 }
 
 func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int) ([]models.EnvironmentVariable, error) {
-	env = append(env, models.EnvironmentVariable{Key: "HOME", Value: "/app"})
 	env = append(env, models.EnvironmentVariable{Key: "PORT", Value: "8080"})
 	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_PORT", Value: "8080"})
 	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_HOST", Value: "0.0.0.0"})
-	env = append(env, models.EnvironmentVariable{Key: "TMPDIR", Value: "$HOME/tmp"})
 
 	vcapAppEnv := map[string]interface{}{}
 	vcapAppEnvIndex := -1

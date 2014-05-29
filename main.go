@@ -55,10 +55,10 @@ var syslogName = flag.String(
 	"syslog name",
 )
 
-var healthChecks = flag.String(
-	"healthChecks",
+var circuses = flag.String(
+	"circuses",
 	"",
-	"health check mapping (stack => health check filename in fileserver)",
+	"app lifecycle binary bundle mapping (stack => bundle filename in fileserver)",
 )
 
 func main() {
@@ -68,13 +68,13 @@ func main() {
 	natsClient := initializeNatsClient(logger)
 	bbs := initializeBbs(logger)
 
-	var healthCheckDownloadURLs map[string]string
-	err := json.Unmarshal([]byte(*healthChecks), &healthCheckDownloadURLs)
+	var circuseDownloadURLs map[string]string
+	err := json.Unmarshal([]byte(*circuses), &circuseDownloadURLs)
 	if err != nil {
 		logger.Fatalf("invalid health checks: %s\n", err)
 	}
 
-	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, healthCheckDownloadURLs, logger)
+	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, circuseDownloadURLs, logger)
 	appManager := ifrit.Envoke(handler.NewHandler(natsClient, bbs, startMessageBuilder, logger))
 
 	logger.Info("app_manager.started")

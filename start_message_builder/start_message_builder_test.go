@@ -2,8 +2,6 @@ package start_message_builder_test
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 	. "github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 
@@ -17,7 +15,7 @@ var _ = Describe("Start Message Builder", func() {
 		builder                   *StartMessageBuilder
 		repAddrRelativeToExecutor string
 		desireAppRequest          models.DesireAppRequestFromCC
-		healthChecks              map[string]string
+		circuses                  map[string]string
 		fileServerURL             string
 	)
 
@@ -25,10 +23,10 @@ var _ = Describe("Start Message Builder", func() {
 		fileServerURL = "http://file-server.com"
 		repAddrRelativeToExecutor = "127.0.0.1:20515"
 		logger := steno.NewLogger("the-logger")
-		healthChecks = map[string]string{
-			"some-stack": "some-health-check.tgz",
+		circuses = map[string]string{
+			"some-stack": "some-circus.tgz",
 		}
-		builder = New(repAddrRelativeToExecutor, healthChecks, logger)
+		builder = New(repAddrRelativeToExecutor, circuses, logger)
 		desireAppRequest = models.DesireAppRequestFromCC{
 			AppId:        "the-app-guid",
 			AppVersion:   "the-app-version",
@@ -71,8 +69,8 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(auction.Actions).Should(HaveLen(3))
 
 		Ω(auction.Actions[0].Action).Should(Equal(models.DownloadAction{
-			From:    "http://file-server.com/v1/static/some-health-check.tgz",
-			To:      "/tmp/diego-health-check",
+			From:    "http://file-server.com/v1/static/some-circus.tgz",
+			To:      "/tmp/circus",
 			Extract: true,
 		}))
 
@@ -93,7 +91,7 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(ok).Should(BeTrue())
 
 		Ω(monitorAction.Action.Action).Should(Equal(models.RunAction{
-			Script: "/tmp/diego-health-check/diego-health-check -addr=:8080",
+			Script: "/tmp/circus/spy -addr=:8080",
 		}))
 
 		Ω(monitorAction.HealthyHook).Should(Equal(models.HealthRequest{
@@ -104,14 +102,7 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(monitorAction.HealthyThreshold).ShouldNot(BeZero())
 		Ω(monitorAction.UnhealthyThreshold).ShouldNot(BeZero())
 
-		Ω(runAction.Script).Should(Equal(stripWhitespace(`
-            cd ./app &&
-            if [ -d .profile.d ];
-            then
-              source .profile.d/*.sh;
-            fi &&
-            the-start-command
-          `)))
+		Ω(runAction.Script).Should(Equal("/tmp/circus/soldier /app the-start-command"))
 
 		Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
 			Nofile: &numFiles,
@@ -120,11 +111,6 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 			Key:   "foo",
 			Value: "bar",
-		}))
-
-		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "HOME",
-			Value: "/app",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
@@ -140,11 +126,6 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
 			Key:   "VCAP_APP_HOST",
 			Value: "0.0.0.0",
-		}))
-
-		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "TMPDIR",
-			Value: "$HOME/tmp",
 		}))
 
 		var vcapAppEnv string
@@ -203,13 +184,8 @@ var _ = Describe("Start Message Builder", func() {
 
 		It("should error", func() {
 			auction, err := builder.Build(desireAppRequest, 22, fileServerURL)
-			Ω(err).Should(MatchError(ErrNoHealthCheckDefined))
+			Ω(err).Should(MatchError(ErrNoCircusDefined))
 			Ω(auction).Should(BeZero())
 		})
 	})
 })
-
-func stripWhitespace(input string) string {
-	whitespaceRegexp := regexp.MustCompile("\\s+")
-	return strings.TrimSpace(whitespaceRegexp.ReplaceAllString(input, " "))
-}
