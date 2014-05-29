@@ -189,18 +189,18 @@ var _ = Describe("Handler", func() {
 			BeforeEach(func() {
 				desireAppRequest.NumInstances = 4
 				bbs.Lock()
-				bbs.ActualLRPs = []models.LRP{
+				bbs.ActualLRPs = []models.ActualLRP{
 					{
 						ProcessGuid:  "the-app-guid-the-app-version",
 						InstanceGuid: "a",
 						Index:        0,
-						State:        models.LRPStateStarting,
+						State:        models.ActualLRPStateStarting,
 					},
 					{
 						ProcessGuid:  "the-app-guid-the-app-version",
 						InstanceGuid: "b",
 						Index:        4,
-						State:        models.LRPStateRunning,
+						State:        models.ActualLRPStateRunning,
 					},
 				}
 				bbs.Unlock()

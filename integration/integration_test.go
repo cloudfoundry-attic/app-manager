@@ -84,7 +84,7 @@ var _ = Describe("Starting apps", func() {
 
 		Context("for an app that has some instances", func() {
 			BeforeEach(func() {
-				bbs.ReportActualLRPAsRunning(models.LRP{
+				bbs.ReportActualLRPAsRunning(models.ActualLRP{
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "a",
 					Index:        0,
