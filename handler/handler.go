@@ -114,7 +114,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		return
 	}
 
-	actualInstances, err := h.actualsForProcessGuid(lrpGuid)
+	actualInstances, instanceGuidToActual, err := h.actualsForProcessGuid(lrpGuid)
 	if err != nil {
 		h.logger.Errord(map[string]interface{}{
 			"desired-app-message": desireAppMessage,
@@ -156,7 +156,12 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 			"desired-app-message": desireAppMessage,
 			"stop-instance-guid":  guidToStop,
 		}, "handler.request-stop")
-		err = h.bbs.RequestStopLRPInstance(models.StopLRPInstance{InstanceGuid: guidToStop})
+		actualToStop := instanceGuidToActual[guidToStop]
+		err = h.bbs.RequestStopLRPInstance(models.StopLRPInstance{
+			ProcessGuid:  actualToStop.ProcessGuid,
+			InstanceGuid: actualToStop.InstanceGuid,
+			Index:        actualToStop.Index,
+		})
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desireAppMessage,
@@ -167,17 +172,19 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 	}
 }
 
-func (h Handler) actualsForProcessGuid(lrpGuid string) (delta_force.ActualInstances, error) {
+func (h Handler) actualsForProcessGuid(lrpGuid string) (delta_force.ActualInstances, map[string]models.ActualLRP, error) {
 	actualInstances := delta_force.ActualInstances{}
 	actualLRPs, err := h.bbs.GetActualLRPsByProcessGuid(lrpGuid)
+	instanceGuidToActual := map[string]models.ActualLRP{}
 
 	if err != nil {
-		return actualInstances, err
+		return actualInstances, instanceGuidToActual, err
 	}
 
 	for _, actualLRP := range actualLRPs {
 		actualInstances = append(actualInstances, delta_force.ActualInstance{actualLRP.Index, actualLRP.InstanceGuid})
+		instanceGuidToActual[actualLRP.InstanceGuid] = actualLRP
 	}
 
-	return actualInstances, err
+	return actualInstances, instanceGuidToActual, err
 }

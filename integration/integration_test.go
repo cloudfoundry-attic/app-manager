@@ -140,7 +140,14 @@ var _ = Describe("Starting apps", func() {
 				Eventually(bbs.GetAllStopLRPInstances).Should(HaveLen(1))
 				stopInstances, err := bbs.GetAllStopLRPInstances()
 				Ω(err).ShouldNot(HaveOccurred())
-				Ω(stopInstances[0].InstanceGuid).Should(Equal("d-extra"))
+
+				stopInstance := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        3,
+					InstanceGuid: "d-extra",
+				}
+
+				Ω(stopInstances[0]).Should(Equal(stopInstance))
 			})
 		})
 	})

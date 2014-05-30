@@ -267,8 +267,16 @@ var _ = Describe("Handler", func() {
 				Eventually(bbs.GetStopLRPInstances).Should(HaveLen(2))
 				stopInstances := bbs.GetStopLRPInstances()
 
-				stopInstance1 := models.StopLRPInstance{InstanceGuid: "c"}
-				stopInstance2 := models.StopLRPInstance{InstanceGuid: "d"}
+				stopInstance1 := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        2,
+					InstanceGuid: "c",
+				}
+				stopInstance2 := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        3,
+					InstanceGuid: "d",
+				}
 
 				Ω(stopInstances).Should(ContainElement(stopInstance1))
 				Ω(stopInstances).Should(ContainElement(stopInstance2))
