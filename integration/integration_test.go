@@ -63,9 +63,8 @@ var _ = Describe("Starting apps", func() {
 		fileServerPresence.Remove()
 	})
 
-	Describe("when a 'diego.desire.app' message is recieved", func() {
-		JustBeforeEach(func() {
-			natsClient.Publish("diego.desire.app", []byte(`
+	var publishDesireWithInstances = func(nInstances int) {
+		natsClient.Publish("diego.desire.app", []byte(fmt.Sprintf(`
         {
           "app_id": "the-app-guid",
           "app_version": "the-app-version",
@@ -74,10 +73,19 @@ var _ = Describe("Starting apps", func() {
           "memory_mb": 128,
           "disk_mb": 512,
           "file_descriptors": 32,
-          "num_instances": 3,
+          "num_instances": %d,
           "stack": "some-stack"
         }
-      `))
+      `, nInstances)))
+	}
+
+	Describe("when a 'diego.desire.app' message is recieved", func() {
+		JustBeforeEach(func() {
+			publishDesireWithInstances(3)
+		})
+
+		It("registers an app desire in etcd", func() {
+			Eventually(bbs.GetAllDesiredLRPs).Should(HaveLen(1))
 		})
 
 		Context("for an app that is not running at all", func() {
@@ -148,6 +156,17 @@ var _ = Describe("Starting apps", func() {
 				}
 
 				Ω(stopInstances[0]).Should(Equal(stopInstance))
+			})
+		})
+
+		Context("when an app is no longer desired", func() {
+			JustBeforeEach(func() {
+				Eventually(bbs.GetAllDesiredLRPs).Should(HaveLen(1))
+				publishDesireWithInstances(0)
+			})
+
+			It("should remove the desired state from etcd", func() {
+				Eventually(bbs.GetAllDesiredLRPs).Should(HaveLen(0))
 			})
 		})
 	})

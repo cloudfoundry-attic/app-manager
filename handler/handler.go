@@ -88,17 +88,32 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		Routes:      desireAppMessage.Routes,
 	}
 
-	err := h.bbs.DesireLRP(desiredLRP)
-	if err != nil {
-		h.logger.Errord(
-			map[string]interface{}{
-				"desired-app-message": desireAppMessage,
-				"error":               err.Error(),
-			},
-			"app-manager.desire-lrp.failed",
-		)
+	if desiredLRP.Instances == 0 {
+		err := h.bbs.RemoveDesiredLRPByProcessGuid(desiredLRP.ProcessGuid)
+		if err != nil {
+			h.logger.Errord(
+				map[string]interface{}{
+					"desired-app-message": desireAppMessage,
+					"error":               err.Error(),
+				},
+				"app-manager.remove-desired-lrp.failed",
+			)
 
-		return
+			return
+		}
+	} else {
+		err := h.bbs.DesireLRP(desiredLRP)
+		if err != nil {
+			h.logger.Errord(
+				map[string]interface{}{
+					"desired-app-message": desireAppMessage,
+					"error":               err.Error(),
+				},
+				"app-manager.desire-lrp.failed",
+			)
+
+			return
+		}
 	}
 
 	fileServerURL, err := h.bbs.GetAvailableFileServer()
@@ -130,6 +145,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 			"desired-app-message": desireAppMessage,
 			"index":               lrpIndex,
 		}, "handler.request-start")
+
 		startMessage, err := h.startMessageBuilder.Build(desireAppMessage, lrpIndex, fileServerURL)
 
 		if err != nil {
@@ -142,6 +158,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		}
 
 		err = h.bbs.RequestLRPStartAuction(startMessage)
+
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desireAppMessage,
@@ -156,12 +173,15 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 			"desired-app-message": desireAppMessage,
 			"stop-instance-guid":  guidToStop,
 		}, "handler.request-stop")
+
 		actualToStop := instanceGuidToActual[guidToStop]
+
 		err = h.bbs.RequestStopLRPInstance(models.StopLRPInstance{
 			ProcessGuid:  actualToStop.ProcessGuid,
 			InstanceGuid: actualToStop.InstanceGuid,
 			Index:        actualToStop.Index,
 		})
+
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desireAppMessage,

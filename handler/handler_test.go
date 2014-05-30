@@ -282,6 +282,45 @@ var _ = Describe("Handler", func() {
 				Ω(stopInstances).Should(ContainElement(stopInstance2))
 			})
 		})
+
+		Context("when the number of desired app instances is zero", func() {
+			BeforeEach(func() {
+				desireAppRequest.NumInstances = 0
+				bbs.Lock()
+				bbs.ActualLRPs = []models.ActualLRP{
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "a",
+						Index:        0,
+						State:        models.ActualLRPStateStarting,
+					},
+				}
+				bbs.Unlock()
+			})
+
+			It("deletes the desired LRP from BBS", func() {
+				Eventually(bbs.GetRemovedDesiredLRPProcessGuids).Should(HaveLen(1))
+				removed := bbs.GetRemovedDesiredLRPProcessGuids()
+				Ω(removed[0]).Should(Equal("the-app-guid-the-app-version"))
+			})
+
+			It("doesn't start anything", func() {
+				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
+			})
+
+			It("stops extra ones", func() {
+				Eventually(bbs.GetStopLRPInstances).Should(HaveLen(1))
+				stopInstances := bbs.GetStopLRPInstances()
+
+				stopInstance := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        0,
+					InstanceGuid: "a",
+				}
+
+				Ω(stopInstances).Should(ContainElement(stopInstance))
+			})
+		})
 	})
 
 	Describe("when a invalid 'diego.desire.app' message is received", func() {
