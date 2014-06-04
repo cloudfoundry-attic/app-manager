@@ -54,6 +54,7 @@ func (h Handler) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 				h.logger.Error("app-manager.handler.watch-closed")
 				desiredChangeChan = nil
 			}
+
 		case err, ok := <-errChan:
 			if ok {
 				h.logger.Errord(map[string]interface{}{

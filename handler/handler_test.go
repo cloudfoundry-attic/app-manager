@@ -72,7 +72,82 @@ var _ = Describe("Handler", func() {
 	AfterEach(func(done Done) {
 		handler.Signal(syscall.SIGINT)
 		<-handler.Wait()
+		Eventually(bbs.DesiredLRPStopChan).Should(BeClosed())
 		close(done)
+	})
+
+	Describe("lifecycle", func() {
+		Describe("waiting until all desired are processed before shutting down", func() {
+			var receivedAuctions chan models.LRPStartAuction
+
+			BeforeEach(func() {
+				receivedAuctions = make(chan models.LRPStartAuction)
+				bbs.WhenRequestingLRPStartAuctions = func(lrp models.LRPStartAuction) error {
+					receivedAuctions <- lrp
+					return nil
+				}
+			})
+
+			It("should not shut down until all desireds are processed", func() {
+				bbs.DesiredLRPChangeChan <- models.DesiredLRPChange{
+					Before: nil,
+					After:  &desiredLRP,
+				}
+				bbs.DesiredLRPChangeChan <- models.DesiredLRPChange{
+					Before: nil,
+					After:  &desiredLRP,
+				}
+
+				handler.Signal(syscall.SIGINT)
+				didShutDown := handler.Wait()
+
+				Consistently(didShutDown).ShouldNot(Receive())
+
+				for i := 0; i < desiredLRP.Instances*2; i++ {
+					Eventually(receivedAuctions).Should(Receive())
+				}
+
+				Eventually(didShutDown).Should(Receive())
+			})
+		})
+
+		Describe("when an error occurs", func() {
+			var newChan chan models.DesiredLRPChange
+			BeforeEach(func() {
+				newChan = make(chan models.DesiredLRPChange, 1)
+				bbs.DesiredLRPChangeChan = newChan
+				bbs.DesiredLRPErrChan <- errors.New("oops")
+			})
+
+			It("should reestablish the watch", func() {
+				newChan <- models.DesiredLRPChange{
+					Before: nil,
+					After:  &desiredLRP,
+				}
+
+				Eventually(bbs.GetLRPStartAuctions).Should(HaveLen(2))
+			})
+		})
+
+		Describe("when the desired channel is closed", func() {
+			var newChan chan models.DesiredLRPChange
+			BeforeEach(func() {
+				newChan = make(chan models.DesiredLRPChange, 1)
+				oldChan := bbs.DesiredLRPChangeChan
+				bbs.DesiredLRPChangeChan = newChan
+				close(oldChan)
+			})
+
+			It("should reestablish the watch", func() {
+				newChan <- models.DesiredLRPChange{
+					Before: nil,
+					After:  &desiredLRP,
+				}
+
+				Eventually(bbs.GetLRPStartAuctions).Should(HaveLen(2))
+			})
+		})
+
 	})
 
 	Describe("when a desired LRP change message is received", func() {
