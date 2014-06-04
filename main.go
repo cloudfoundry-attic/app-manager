@@ -13,9 +13,11 @@ import (
 	"github.com/cloudfoundry/storeadapter/workerpool"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
+	"github.com/cloudfoundry-incubator/app-manager/nsync"
 	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 )
 
@@ -75,11 +77,15 @@ func main() {
 	}
 
 	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, circuseDownloadURLs, logger)
-	appManager := ifrit.Envoke(handler.NewHandler(natsClient, bbs, startMessageBuilder, logger))
+
+	group := grouper.EnvokeGroup(grouper.RunGroup{
+		"handler": handler.NewHandler(bbs, startMessageBuilder, logger),
+		"nsync":   nsync.NewNsync(natsClient, bbs, logger),
+	})
 
 	logger.Info("app_manager.started")
 
-	monitor := ifrit.Envoke(sigmon.New(appManager))
+	monitor := ifrit.Envoke(sigmon.New(group))
 
 	err = <-monitor.Wait()
 	if err != nil {

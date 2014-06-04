@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"sync"
 
@@ -12,28 +10,22 @@ import (
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/yagnats"
 )
-
-const DesireAppTopic = "diego.desire.app"
 
 var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
 
 type Handler struct {
-	natsClient          yagnats.NATSClient
 	bbs                 Bbs.AppManagerBBS
 	startMessageBuilder *start_message_builder.StartMessageBuilder
 	logger              *steno.Logger
 }
 
 func NewHandler(
-	natsClient yagnats.NATSClient,
 	bbs Bbs.AppManagerBBS,
 	startMessageBuilder *start_message_builder.StartMessageBuilder,
 	logger *steno.Logger,
 ) Handler {
 	return Handler{
-		natsClient:          natsClient,
 		bbs:                 bbs,
 		startMessageBuilder: startMessageBuilder,
 		logger:              logger,
@@ -42,85 +34,63 @@ func NewHandler(
 
 func (h Handler) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	wg := new(sync.WaitGroup)
-	desiredApps := make(chan models.DesireAppRequestFromCC)
-	h.listenForDesiredApps(desiredApps)
+	desiredChangeChan, stopChan, errChan := h.bbs.WatchForDesiredLRPChanges()
 
 	close(ready)
 
 	for {
+		if desiredChangeChan == nil {
+			desiredChangeChan, stopChan, errChan = h.bbs.WatchForDesiredLRPChanges()
+		}
 		select {
-		case msg := <-desiredApps:
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				h.desireApp(msg)
-			}()
+		case desiredChange, ok := <-desiredChangeChan:
+			if ok {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					h.processDesiredChange(desiredChange)
+				}()
+			} else {
+				h.logger.Error("app-manager.handler.watch-closed")
+				desiredChangeChan = nil
+			}
+		case err, ok := <-errChan:
+			if ok {
+				h.logger.Errord(map[string]interface{}{
+					"error": err.Error(),
+				}, "app-manager.handler.received-watch-error")
+			}
+			desiredChangeChan = nil
+
 		case <-signals:
-			h.natsClient.UnsubscribeAll(DesireAppTopic)
+			h.logger.Info("app-manager.handler.shutting-down")
+			close(stopChan)
 			wg.Wait()
+			h.logger.Info("app-manager.handler.shut-down")
 			return nil
 		}
 	}
+
+	return nil
 }
 
-func (h Handler) listenForDesiredApps(desiredApps chan models.DesireAppRequestFromCC) {
-	h.natsClient.Subscribe(DesireAppTopic, func(message *yagnats.Message) {
-		desireAppMessage := models.DesireAppRequestFromCC{}
-		err := json.Unmarshal(message.Payload, &desireAppMessage)
-		if err != nil {
-			h.logger.Errorf("Failed to parse NATS message.")
-			return
-		}
+func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
+	var desiredLRP models.DesiredLRP
+	var desiredInstances int
 
-		desiredApps <- desireAppMessage
-	})
-}
-
-func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
-	lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
-
-	desiredLRP := models.DesiredLRP{
-		ProcessGuid: lrpGuid,
-		Instances:   desireAppMessage.NumInstances,
-		MemoryMB:    desireAppMessage.MemoryMB,
-		DiskMB:      desireAppMessage.DiskMB,
-		Stack:       desireAppMessage.Stack,
-		Routes:      desireAppMessage.Routes,
-	}
-
-	if desiredLRP.Instances == 0 {
-		err := h.bbs.RemoveDesiredLRPByProcessGuid(desiredLRP.ProcessGuid)
-		if err != nil {
-			h.logger.Errord(
-				map[string]interface{}{
-					"desired-app-message": desireAppMessage,
-					"error":               err.Error(),
-				},
-				"app-manager.remove-desired-lrp.failed",
-			)
-
-			return
-		}
+	if desiredChange.After == nil {
+		desiredLRP = *desiredChange.Before
+		desiredInstances = 0
 	} else {
-		err := h.bbs.DesireLRP(desiredLRP)
-		if err != nil {
-			h.logger.Errord(
-				map[string]interface{}{
-					"desired-app-message": desireAppMessage,
-					"error":               err.Error(),
-				},
-				"app-manager.desire-lrp.failed",
-			)
-
-			return
-		}
+		desiredLRP = *desiredChange.After
+		desiredInstances = desiredLRP.Instances
 	}
 
 	fileServerURL, err := h.bbs.GetAvailableFileServer()
 	if err != nil {
 		h.logger.Warnd(
 			map[string]interface{}{
-				"desired-app-message": desireAppMessage,
+				"desired-app-message": desiredLRP,
 				"error":               err.Error(),
 			},
 			"handler.get-available-file-server.failed",
@@ -129,28 +99,28 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		return
 	}
 
-	actualInstances, instanceGuidToActual, err := h.actualsForProcessGuid(lrpGuid)
+	actualInstances, instanceGuidToActual, err := h.actualsForProcessGuid(desiredLRP.ProcessGuid)
 	if err != nil {
 		h.logger.Errord(map[string]interface{}{
-			"desired-app-message": desireAppMessage,
+			"desired-app-message": desiredLRP,
 			"error":               err,
 		}, "handler.fetch-actuals.failed")
 		return
 	}
 
-	delta := delta_force.Reconcile(desireAppMessage.NumInstances, actualInstances)
+	delta := delta_force.Reconcile(desiredInstances, actualInstances)
 
 	for _, lrpIndex := range delta.IndicesToStart {
 		h.logger.Infod(map[string]interface{}{
-			"desired-app-message": desireAppMessage,
+			"desired-app-message": desiredLRP,
 			"index":               lrpIndex,
 		}, "handler.request-start")
 
-		startMessage, err := h.startMessageBuilder.Build(desireAppMessage, lrpIndex, fileServerURL)
+		startMessage, err := h.startMessageBuilder.Build(desiredLRP, lrpIndex, fileServerURL)
 
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
-				"desired-app-message": desireAppMessage,
+				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
 				"error":               err,
 			}, "handler.build-start-message.failed")
@@ -161,7 +131,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
-				"desired-app-message": desireAppMessage,
+				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
 				"error":               err,
 			}, "handler.request-start-auction.failed")
@@ -170,7 +140,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 
 	for _, guidToStop := range delta.GuidsToStop {
 		h.logger.Infod(map[string]interface{}{
-			"desired-app-message": desireAppMessage,
+			"desired-app-message": desiredLRP,
 			"stop-instance-guid":  guidToStop,
 		}, "handler.request-stop")
 
@@ -184,7 +154,7 @@ func (h Handler) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 
 		if err != nil {
 			h.logger.Errord(map[string]interface{}{
-				"desired-app-message": desireAppMessage,
+				"desired-app-message": desiredLRP,
 				"stop-instance-guid":  guidToStop,
 				"error":               err,
 			}, "handler.request-stop-instance.failed")

@@ -14,7 +14,7 @@ var _ = Describe("Start Message Builder", func() {
 	var (
 		builder                   *StartMessageBuilder
 		repAddrRelativeToExecutor string
-		desireAppRequest          models.DesireAppRequestFromCC
+		desiredLRP                models.DesiredLRP
 		circuses                  map[string]string
 		fileServerURL             string
 	)
@@ -27,10 +27,9 @@ var _ = Describe("Start Message Builder", func() {
 			"some-stack": "some-circus.tgz",
 		}
 		builder = New(repAddrRelativeToExecutor, circuses, logger)
-		desireAppRequest = models.DesireAppRequestFromCC{
-			AppId:        "the-app-guid",
-			AppVersion:   "the-app-version",
-			DropletUri:   "http://the-droplet.uri.com",
+		desiredLRP = models.DesiredLRP{
+			ProcessGuid:  "the-app-guid-the-app-version",
+			Source:       "http://the-droplet.uri.com",
 			Stack:        "some-stack",
 			StartCommand: "the-start-command",
 			Environment: []models.EnvironmentVariable{
@@ -40,13 +39,14 @@ var _ = Describe("Start Message Builder", func() {
 			MemoryMB:        128,
 			DiskMB:          512,
 			FileDescriptors: 32,
-			NumInstances:    23,
+			Instances:       23,
 			Routes:          []string{"route1", "route2"},
+			LogGuid:         "the-log-id",
 		}
 	})
 
 	It("builds a valid LRPStartAuction", func() {
-		auction, err := builder.Build(desireAppRequest, 22, fileServerURL)
+		auction, err := builder.Build(desiredLRP, 22, fileServerURL)
 		Ω(err).ShouldNot(HaveOccurred())
 
 		Ω(auction.Index).Should(Equal(22))
@@ -61,7 +61,7 @@ var _ = Describe("Start Message Builder", func() {
 		twentyTwo := 22
 		numFiles := uint64(32)
 		Ω(auction.Log).Should(Equal(models.LogConfig{
-			Guid:       "the-app-guid",
+			Guid:       "the-log-id",
 			SourceName: "App",
 			Index:      &twentyTwo,
 		}))
@@ -145,10 +145,10 @@ var _ = Describe("Start Message Builder", func() {
 	})
 
 	It("assigns unique instance guids to the auction requests", func() {
-		auction, err := builder.Build(desireAppRequest, 22, fileServerURL)
+		auction, err := builder.Build(desiredLRP, 22, fileServerURL)
 		Ω(err).ShouldNot(HaveOccurred())
 
-		secondStartAuction, err := builder.Build(desireAppRequest, 22, fileServerURL)
+		secondStartAuction, err := builder.Build(desiredLRP, 22, fileServerURL)
 		Ω(err).ShouldNot(HaveOccurred())
 
 		Ω(auction.InstanceGuid).ShouldNot(Equal(secondStartAuction.InstanceGuid))
@@ -156,11 +156,11 @@ var _ = Describe("Start Message Builder", func() {
 
 	Context("when there is no file descriptor limit", func() {
 		BeforeEach(func() {
-			desireAppRequest.FileDescriptors = 0
+			desiredLRP.FileDescriptors = 0
 		})
 
 		It("does not set any FD limit on the run action", func() {
-			auction, err := builder.Build(desireAppRequest, 22, fileServerURL)
+			auction, err := builder.Build(desiredLRP, 22, fileServerURL)
 			Ω(err).ShouldNot(HaveOccurred())
 
 			Ω(auction.Actions).Should(HaveLen(3))
@@ -179,11 +179,11 @@ var _ = Describe("Start Message Builder", func() {
 
 	Context("when requesting a stack with no associated health-check", func() {
 		BeforeEach(func() {
-			desireAppRequest.Stack = "some-other-stack"
+			desiredLRP.Stack = "some-other-stack"
 		})
 
 		It("should error", func() {
-			auction, err := builder.Build(desireAppRequest, 22, fileServerURL)
+			auction, err := builder.Build(desiredLRP, 22, fileServerURL)
 			Ω(err).Should(MatchError(ErrNoCircusDefined))
 			Ω(auction).Should(BeZero())
 		})

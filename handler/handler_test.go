@@ -1,7 +1,6 @@
 package handler_test
 
 import (
-	"encoding/json"
 	"errors"
 	"syscall"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/storeadapter"
-	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	"github.com/tedsuo/ifrit"
 
 	. "github.com/onsi/ginkgo"
@@ -20,11 +18,10 @@ import (
 
 var _ = Describe("Handler", func() {
 	var (
-		fakenats                  *fakeyagnats.FakeYagnats
 		startMessageBuilder       *start_message_builder.StartMessageBuilder
 		bbs                       *fake_bbs.FakeAppManagerBBS
 		logSink                   *steno.TestingSink
-		desireAppRequest          models.DesireAppRequestFromCC
+		desiredLRP                models.DesiredLRP
 		repAddrRelativeToExecutor string
 		healthChecks              map[string]string
 
@@ -41,8 +38,6 @@ var _ = Describe("Handler", func() {
 		logger := steno.NewLogger("the-logger")
 		steno.EnterTestMode()
 
-		fakenats = fakeyagnats.New()
-
 		bbs = fake_bbs.NewFakeAppManagerBBS()
 
 		repAddrRelativeToExecutor = "127.0.0.1:20515"
@@ -53,12 +48,11 @@ var _ = Describe("Handler", func() {
 
 		startMessageBuilder = start_message_builder.New(repAddrRelativeToExecutor, healthChecks, logger)
 
-		handlerRunner := NewHandler(fakenats, bbs, startMessageBuilder, logger)
+		handlerRunner := NewHandler(bbs, startMessageBuilder, logger)
 
-		desireAppRequest = models.DesireAppRequestFromCC{
-			AppId:        "the-app-guid",
-			AppVersion:   "the-app-version",
-			DropletUri:   "http://the-droplet.uri.com",
+		desiredLRP = models.DesiredLRP{
+			ProcessGuid:  "the-app-guid-the-app-version",
+			Source:       "http://the-droplet.uri.com",
 			Stack:        "some-stack",
 			StartCommand: "the-start-command",
 			Environment: []models.EnvironmentVariable{
@@ -68,8 +62,9 @@ var _ = Describe("Handler", func() {
 			MemoryMB:        128,
 			DiskMB:          512,
 			FileDescriptors: 32,
-			NumInstances:    2,
+			Instances:       2,
 			Routes:          []string{"route1", "route2"},
+			LogGuid:         "the-log-id",
 		}
 		handler = ifrit.Envoke(handlerRunner)
 	})
@@ -80,12 +75,12 @@ var _ = Describe("Handler", func() {
 		close(done)
 	})
 
-	Describe("when a 'diego.desire.app' message is received", func() {
+	Describe("when a desired LRP change message is received", func() {
 		JustBeforeEach(func() {
-			messagePayload, err := json.Marshal(desireAppRequest)
-			Ω(err).ShouldNot(HaveOccurred())
-
-			fakenats.Publish("diego.desire.app", messagePayload)
+			bbs.DesiredLRPChangeChan <- models.DesiredLRPChange{
+				Before: nil,
+				After:  &desiredLRP,
+			}
 		})
 
 		Describe("the happy path", func() {
@@ -93,17 +88,6 @@ var _ = Describe("Handler", func() {
 				bbs.WhenGettingAvailableFileServer = func() (string, error) {
 					return "http://file-server.com/", nil
 				}
-			})
-
-			It("marks the LRP desired in the bbs", func() {
-				Eventually(bbs.DesiredLRPs).Should(ContainElement(models.DesiredLRP{
-					ProcessGuid: "the-app-guid-the-app-version",
-					Instances:   2,
-					MemoryMB:    128,
-					DiskMB:      512,
-					Stack:       "some-stack",
-					Routes:      []string{"route1", "route2"},
-				}))
 			})
 
 			It("puts a LRPStartAuction in the bbs", func() {
@@ -132,16 +116,6 @@ var _ = Describe("Handler", func() {
 			})
 		})
 
-		Context("when marking the LRP as desired fails", func() {
-			BeforeEach(func() {
-				bbs.DesireLRPErr = errors.New("oh no!")
-			})
-
-			It("does not put a LRPStartAuction in the bbs", func() {
-				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
-			})
-		})
-
 		Context("when file server is not available", func() {
 			BeforeEach(func() {
 				bbs.WhenGettingAvailableFileServer = func() (string, error) {
@@ -156,7 +130,7 @@ var _ = Describe("Handler", func() {
 
 		Context("when unable to build a start message", func() {
 			BeforeEach(func() {
-				desireAppRequest.Stack = "some-unknown-stack"
+				desiredLRP.Stack = "some-unknown-stack"
 			})
 
 			It("does not put a LRPStartAuction in the bbs", func() {
@@ -187,7 +161,7 @@ var _ = Describe("Handler", func() {
 
 		Context("when there are already instances running for the desired app, but some are missing", func() {
 			BeforeEach(func() {
-				desireAppRequest.NumInstances = 4
+				desiredLRP.Instances = 4
 				bbs.Lock()
 				bbs.ActualLRPs = []models.ActualLRP{
 					{
@@ -226,9 +200,9 @@ var _ = Describe("Handler", func() {
 			})
 		})
 
-		Context("when there are extra instanes running for the desired app", func() {
+		Context("when there are extra instances running for the desired app", func() {
 			BeforeEach(func() {
-				desireAppRequest.NumInstances = 2
+				desiredLRP.Instances = 2
 				bbs.Lock()
 				bbs.ActualLRPs = []models.ActualLRP{
 					{
@@ -282,62 +256,44 @@ var _ = Describe("Handler", func() {
 				Ω(stopInstances).Should(ContainElement(stopInstance2))
 			})
 		})
-
-		Context("when the number of desired app instances is zero", func() {
-			BeforeEach(func() {
-				desireAppRequest.NumInstances = 0
-				bbs.Lock()
-				bbs.ActualLRPs = []models.ActualLRP{
-					{
-						ProcessGuid:  "the-app-guid-the-app-version",
-						InstanceGuid: "a",
-						Index:        0,
-						State:        models.ActualLRPStateStarting,
-					},
-				}
-				bbs.Unlock()
-			})
-
-			It("deletes the desired LRP from BBS", func() {
-				Eventually(bbs.GetRemovedDesiredLRPProcessGuids).Should(HaveLen(1))
-				removed := bbs.GetRemovedDesiredLRPProcessGuids()
-				Ω(removed[0]).Should(Equal("the-app-guid-the-app-version"))
-			})
-
-			It("doesn't start anything", func() {
-				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
-			})
-
-			It("stops extra ones", func() {
-				Eventually(bbs.GetStopLRPInstances).Should(HaveLen(1))
-				stopInstances := bbs.GetStopLRPInstances()
-
-				stopInstance := models.StopLRPInstance{
-					ProcessGuid:  "the-app-guid-the-app-version",
-					Index:        0,
-					InstanceGuid: "a",
-				}
-
-				Ω(stopInstances).Should(ContainElement(stopInstance))
-			})
-		})
 	})
 
-	Describe("when a invalid 'diego.desire.app' message is received", func() {
+	Describe("when a desired LRP is deleted", func() {
+		JustBeforeEach(func() {
+			bbs.DesiredLRPChangeChan <- models.DesiredLRPChange{
+				Before: &desiredLRP,
+				After:  nil,
+			}
+		})
+
 		BeforeEach(func() {
-			fakenats.Publish("diego.desire.app", []byte(`
-        {
-          "some_random_key": "does not matter"
-      `))
+			bbs.Lock()
+			bbs.ActualLRPs = []models.ActualLRP{
+				{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					InstanceGuid: "a",
+					Index:        0,
+					State:        models.ActualLRPStateStarting,
+				},
+			}
+			bbs.Unlock()
 		})
 
-		It("logs an error", func() {
-			Eventually(logSink.Records).ShouldNot(HaveLen(0))
-			Ω(logSink.Records()[0].Message).Should(ContainSubstring("Failed to parse NATS message."))
-		})
-
-		It("does not put an LRP into the BBS", func() {
+		It("doesn't start anything", func() {
 			Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
+		})
+
+		It("stops all instances", func() {
+			Eventually(bbs.GetStopLRPInstances).Should(HaveLen(1))
+			stopInstances := bbs.GetStopLRPInstances()
+
+			stopInstance := models.StopLRPInstance{
+				ProcessGuid:  "the-app-guid-the-app-version",
+				Index:        0,
+				InstanceGuid: "a",
+			}
+
+			Ω(stopInstances).Should(ContainElement(stopInstance))
 		})
 	})
 })

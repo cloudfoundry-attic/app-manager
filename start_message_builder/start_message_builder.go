@@ -31,8 +31,8 @@ func New(repAddrRelativeToExecutor string, circuses map[string]string, logger *s
 	}
 }
 
-func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFromCC, lrpIndex int, fileServerURL string) (models.LRPStartAuction, error) {
-	lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
+func (b *StartMessageBuilder) Build(desiredLRP models.DesiredLRP, lrpIndex int, fileServerURL string) (models.LRPStartAuction, error) {
+	lrpGuid := desiredLRP.ProcessGuid
 
 	instanceGuid, err := uuid.NewV4()
 	if err != nil {
@@ -40,12 +40,12 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 		return models.LRPStartAuction{}, err
 	}
 
-	circusURL, err := b.circusDownloadURL(desireAppMessage.Stack, fileServerURL)
+	circusURL, err := b.circusDownloadURL(desiredLRP.Stack, fileServerURL)
 	if err != nil {
 		b.logger.Warnd(
 			map[string]interface{}{
 				"error": err.Error(),
-				"stack": desireAppMessage.Stack,
+				"stack": desiredLRP.Stack,
 			},
 			"handler.construct-circus-download-url.failed",
 		)
@@ -53,7 +53,7 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 		return models.LRPStartAuction{}, err
 	}
 
-	lrpEnv, err := createLrpEnv(desireAppMessage.Environment, lrpGuid, lrpIndex)
+	lrpEnv, err := createLrpEnv(desiredLRP.Environment, lrpGuid, lrpIndex)
 	if err != nil {
 		b.logger.Warnd(
 			map[string]interface{}{
@@ -66,8 +66,8 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 	}
 
 	var numFiles *uint64
-	if desireAppMessage.FileDescriptors != 0 {
-		numFiles = &desireAppMessage.FileDescriptors
+	if desiredLRP.FileDescriptors != 0 {
+		numFiles = &desiredLRP.FileDescriptors
 	}
 
 	repRequests := router.NewRequestGenerator(
@@ -94,16 +94,16 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 		State:        models.LRPStartAuctionStatePending,
 		Index:        lrpIndex,
 
-		MemoryMB: desireAppMessage.MemoryMB,
-		DiskMB:   desireAppMessage.DiskMB,
+		MemoryMB: desiredLRP.MemoryMB,
+		DiskMB:   desiredLRP.DiskMB,
 
 		Ports: []models.PortMapping{
 			{ContainerPort: 8080},
 		},
 
-		Stack: desireAppMessage.Stack,
+		Stack: desiredLRP.Stack,
 		Log: models.LogConfig{
-			Guid:       desireAppMessage.AppId,
+			Guid:       desiredLRP.LogGuid,
 			SourceName: "App",
 			Index:      &lrpIndex,
 		},
@@ -117,7 +117,7 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 			},
 			{
 				Action: models.DownloadAction{
-					From:     desireAppMessage.DropletUri,
+					From:     desiredLRP.Source,
 					To:       ".",
 					Extract:  true,
 					CacheKey: fmt.Sprintf("droplets-%s", lrpGuid),
@@ -126,7 +126,7 @@ func (b *StartMessageBuilder) Build(desireAppMessage models.DesireAppRequestFrom
 			models.Parallel(
 				models.ExecutorAction{
 					models.RunAction{
-						Script:  "/tmp/circus/soldier /app " + desireAppMessage.StartCommand,
+						Script:  "/tmp/circus/soldier /app " + desiredLRP.StartCommand,
 						Env:     lrpEnv,
 						Timeout: 0,
 						ResourceLimits: models.ResourceLimits{
