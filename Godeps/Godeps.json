@@ -10,6 +10,10 @@
 			"Rev": "48be7df2c27e1cec821a3284a683ce6ef90d9052"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/delta_force",
+			"Rev": "506afd2ef81a6c43bd0e5720f6903a36b1ac6535"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry-incubator/rep/routes",
 			"Rev": "fdcd3a640cb6f3585675c2749e2079d15754f318"
 		},
