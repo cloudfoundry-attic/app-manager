@@ -15,7 +15,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/rep/routes",
-			"Rev": "871565d223e7c8ea8e1828c7aa000e5cb9d1c769"
+			"Rev": "77f849228b8a10a0437e913c9ebd2e41281786e7"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
