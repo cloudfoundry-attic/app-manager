@@ -42,8 +42,7 @@ var _ = Describe("Nsync", func() {
 		nsyncRunner := NewNsync(fakenats, bbs, logger)
 
 		desireAppRequest = models.DesireAppRequestFromCC{
-			AppId:        "the-app-guid",
-			AppVersion:   "the-app-version",
+			ProcessGuid:  "some-guid",
 			DropletUri:   "http://the-droplet.uri.com",
 			Stack:        "some-stack",
 			StartCommand: "the-start-command",
@@ -56,6 +55,7 @@ var _ = Describe("Nsync", func() {
 			FileDescriptors: 32,
 			NumInstances:    2,
 			Routes:          []string{"route1", "route2"},
+			LogGuid:         "some-log-guid",
 		}
 		nsync = ifrit.Envoke(nsyncRunner)
 	})
@@ -83,7 +83,7 @@ var _ = Describe("Nsync", func() {
 
 			It("marks the LRP desired in the bbs", func() {
 				Eventually(bbs.DesiredLRPs).Should(ContainElement(models.DesiredLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "some-guid",
 					Instances:    2,
 					MemoryMB:     128,
 					DiskMB:       512,
@@ -96,7 +96,7 @@ var _ = Describe("Nsync", func() {
 					FileDescriptors: 32,
 					Source:          "http://the-droplet.uri.com",
 					Routes:          []string{"route1", "route2"},
-					LogGuid:         "the-app-guid",
+					LogGuid:         "some-log-guid",
 				}))
 			})
 		})
@@ -107,7 +107,7 @@ var _ = Describe("Nsync", func() {
 				bbs.Lock()
 				bbs.ActualLRPs = []models.ActualLRP{
 					{
-						ProcessGuid:  "the-app-guid-the-app-version",
+						ProcessGuid:  "some-guid",
 						InstanceGuid: "a",
 						Index:        0,
 						State:        models.ActualLRPStateStarting,
@@ -119,7 +119,7 @@ var _ = Describe("Nsync", func() {
 			It("deletes the desired LRP from BBS", func() {
 				Eventually(bbs.GetRemovedDesiredLRPProcessGuids).Should(HaveLen(1))
 				removed := bbs.GetRemovedDesiredLRPProcessGuids()
-				Ω(removed[0]).Should(Equal("the-app-guid-the-app-version"))
+				Ω(removed[0]).Should(Equal("some-guid"))
 			})
 		})
 	})

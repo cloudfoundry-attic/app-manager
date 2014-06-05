@@ -66,15 +66,15 @@ var _ = Describe("Starting apps", func() {
 	var publishDesireWithInstances = func(nInstances int) {
 		natsClient.Publish("diego.desire.app", []byte(fmt.Sprintf(`
         {
-          "app_id": "the-app-guid",
-          "app_version": "the-app-version",
+          "process_guid": "the-guid",
           "droplet_uri": "http://the-droplet.uri.com",
           "start_command": "the-start-command",
           "memory_mb": 128,
           "disk_mb": 512,
           "file_descriptors": 32,
           "num_instances": %d,
-          "stack": "some-stack"
+          "stack": "some-stack",
+          "log_guid": "the-log-guid"
         }
       `, nInstances)))
 	}
@@ -97,7 +97,7 @@ var _ = Describe("Starting apps", func() {
 		Context("for an app that is missing instances", func() {
 			BeforeEach(func() {
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "the-guid",
 					InstanceGuid: "a",
 					Index:        0,
 				}, "executor-id")
@@ -119,25 +119,25 @@ var _ = Describe("Starting apps", func() {
 		Context("for an app that has extra instances", func() {
 			BeforeEach(func() {
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "the-guid",
 					InstanceGuid: "a",
 					Index:        0,
 				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "the-guid",
 					InstanceGuid: "b",
 					Index:        1,
 				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "the-guid",
 					InstanceGuid: "c",
 					Index:        2,
 				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
-					ProcessGuid:  "the-app-guid-the-app-version",
+					ProcessGuid:  "the-guid",
 					InstanceGuid: "d-extra",
 					Index:        3,
 				}, "executor-id")
@@ -149,7 +149,7 @@ var _ = Describe("Starting apps", func() {
 				stopInstances, err := bbs.GetAllStopLRPInstances()
 				Ω(err).ShouldNot(HaveOccurred())
 
-				Ω(stopInstances[0].ProcessGuid).Should(Equal("the-app-guid-the-app-version"))
+				Ω(stopInstances[0].ProcessGuid).Should(Equal("the-guid"))
 				Ω(stopInstances[0].Index).Should(Equal(3))
 				Ω(stopInstances[0].InstanceGuid).Should(Equal("d-extra"))
 			})

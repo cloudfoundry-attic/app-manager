@@ -2,7 +2,6 @@ package nsync
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
 
@@ -69,10 +68,8 @@ func (n *Nsync) listenForDesiredApps(desiredApps chan models.DesireAppRequestFro
 }
 
 func (n *Nsync) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
-	lrpGuid := fmt.Sprintf("%s-%s", desireAppMessage.AppId, desireAppMessage.AppVersion)
-
 	desiredLRP := models.DesiredLRP{
-		ProcessGuid:     lrpGuid,
+		ProcessGuid:     desireAppMessage.ProcessGuid,
 		Source:          desireAppMessage.DropletUri,
 		FileDescriptors: desireAppMessage.FileDescriptors,
 		Environment:     desireAppMessage.Environment,
@@ -82,7 +79,7 @@ func (n *Nsync) desireApp(desireAppMessage models.DesireAppRequestFromCC) {
 		DiskMB:          desireAppMessage.DiskMB,
 		Stack:           desireAppMessage.Stack,
 		Routes:          desireAppMessage.Routes,
-		LogGuid:         desireAppMessage.AppId,
+		LogGuid:         desireAppMessage.LogGuid,
 	}
 
 	if desiredLRP.Instances == 0 {
