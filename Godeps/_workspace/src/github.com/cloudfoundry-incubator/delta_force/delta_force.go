@@ -11,6 +11,10 @@ type Result struct {
 	IndicesToStopOneGuid []int
 }
 
+func (r Result) Empty() bool {
+	return len(r.IndicesToStart) == 0 && len(r.GuidsToStop) == 0 && len(r.IndicesToStopOneGuid) == 0
+}
+
 type ActualInstances []ActualInstance
 
 func (a ActualInstances) hasIndex(index int) bool {

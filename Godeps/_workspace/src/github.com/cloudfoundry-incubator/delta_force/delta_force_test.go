@@ -110,4 +110,41 @@ var _ = Describe("DeltaForce", func() {
 			Ω(result.IndicesToStopOneGuid).Should(Equal([]int{0, 2}))
 		})
 	})
+
+	Describe("Result", func() {
+		Context("when empty", func() {
+			It("should say so", func() {
+				result := Result{}
+				Ω(result.Empty()).Should(BeTrue())
+
+				result = Result{
+					IndicesToStart:       []int{},
+					GuidsToStop:          []string{},
+					IndicesToStopOneGuid: []int{},
+				}
+				Ω(result.Empty()).Should(BeTrue())
+
+				result = Result{
+					IndicesToStart:       []int{1},
+					GuidsToStop:          []string{},
+					IndicesToStopOneGuid: []int{},
+				}
+				Ω(result.Empty()).Should(BeFalse())
+
+				result = Result{
+					IndicesToStart:       []int{},
+					GuidsToStop:          []string{"foo"},
+					IndicesToStopOneGuid: []int{},
+				}
+				Ω(result.Empty()).Should(BeFalse())
+
+				result = Result{
+					IndicesToStart:       []int{},
+					GuidsToStop:          []string{},
+					IndicesToStopOneGuid: []int{1},
+				}
+				Ω(result.Empty()).Should(BeFalse())
+			})
+		})
+	})
 })

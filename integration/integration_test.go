@@ -100,7 +100,7 @@ var _ = Describe("Starting apps", func() {
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "a",
 					Index:        0,
-				})
+				}, "executor-id")
 			})
 
 			It("start auctions for the missing instances", func() {
@@ -122,25 +122,25 @@ var _ = Describe("Starting apps", func() {
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "a",
 					Index:        0,
-				})
+				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "b",
 					Index:        1,
-				})
+				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "c",
 					Index:        2,
-				})
+				}, "executor-id")
 
 				bbs.ReportActualLRPAsRunning(models.ActualLRP{
 					ProcessGuid:  "the-app-guid-the-app-version",
 					InstanceGuid: "d-extra",
 					Index:        3,
-				})
+				}, "executor-id")
 			})
 
 			It("stops the extra instances", func() {
@@ -149,13 +149,9 @@ var _ = Describe("Starting apps", func() {
 				stopInstances, err := bbs.GetAllStopLRPInstances()
 				Ω(err).ShouldNot(HaveOccurred())
 
-				stopInstance := models.StopLRPInstance{
-					ProcessGuid:  "the-app-guid-the-app-version",
-					Index:        3,
-					InstanceGuid: "d-extra",
-				}
-
-				Ω(stopInstances[0]).Should(Equal(stopInstance))
+				Ω(stopInstances[0].ProcessGuid).Should(Equal("the-app-guid-the-app-version"))
+				Ω(stopInstances[0].Index).Should(Equal(3))
+				Ω(stopInstances[0].InstanceGuid).Should(Equal("d-extra"))
 			})
 		})
 
