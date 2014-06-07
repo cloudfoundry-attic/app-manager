@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
-	"github.com/cloudfoundry-incubator/delta_force"
+	"github.com/cloudfoundry-incubator/delta_force/delta_force"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	steno "github.com/cloudfoundry/gosteno"
