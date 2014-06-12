@@ -104,7 +104,7 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 	if err != nil {
 		h.logger.Errord(map[string]interface{}{
 			"desired-app-message": desiredLRP,
-			"error":               err,
+			"error":               err.Error(),
 		}, "handler.fetch-actuals.failed")
 		return
 	}
@@ -123,7 +123,7 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
-				"error":               err,
+				"error":               err.Error(),
 			}, "handler.build-start-message.failed")
 			continue
 		}
@@ -134,7 +134,7 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
-				"error":               err,
+				"error":               err.Error(),
 			}, "handler.request-start-auction.failed")
 		}
 	}
@@ -157,7 +157,7 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 			h.logger.Errord(map[string]interface{}{
 				"desired-app-message": desiredLRP,
 				"stop-instance-guid":  guidToStop,
-				"error":               err,
+				"error":               err.Error(),
 			}, "handler.request-stop-instance.failed")
 		}
 	}
