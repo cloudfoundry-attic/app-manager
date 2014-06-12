@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cloudfoundry/storeadapter/test_helpers"
@@ -50,7 +49,6 @@ var _ = Describe("Starting apps", func() {
 		runner = app_manager_runner.New(
 			appManagerPath,
 			etcdRunner.NodeURLS(),
-			[]string{fmt.Sprintf("127.0.0.1:%d", natsPort)},
 			map[string]string{"some-stack": "some-health-check.tar.gz"},
 			"127.0.0.1:20515",
 		)
@@ -63,25 +61,22 @@ var _ = Describe("Starting apps", func() {
 		fileServerPresence.Remove()
 	})
 
-	var publishDesireWithInstances = func(nInstances int) {
-		natsClient.Publish("diego.desire.app", []byte(fmt.Sprintf(`
-        {
-          "process_guid": "the-guid",
-          "droplet_uri": "http://the-droplet.uri.com",
-          "start_command": "the-start-command",
-          "memory_mb": 128,
-          "disk_mb": 512,
-          "file_descriptors": 32,
-          "num_instances": %d,
-          "stack": "some-stack",
-          "log_guid": "the-log-guid"
-        }
-      `, nInstances)))
-	}
-
 	Describe("when a 'diego.desire.app' message is recieved", func() {
 		JustBeforeEach(func() {
-			publishDesireWithInstances(3)
+			err := bbs.DesireLRP(models.DesiredLRP{
+				ProcessGuid:     "the-guid",
+				Source:          "http://the-droplet.uri.com",
+				FileDescriptors: 32,
+				Environment:     nil,
+				StartCommand:    "the-start-command",
+				Instances:       3,
+				MemoryMB:        128,
+				DiskMB:          512,
+				Stack:           "some-stack",
+				Routes:          nil,
+				LogGuid:         "the-log-guid",
+			})
+			Ω(err).ShouldNot(HaveOccurred())
 		})
 
 		It("registers an app desire in etcd", func() {
@@ -158,7 +153,8 @@ var _ = Describe("Starting apps", func() {
 		Context("when an app is no longer desired", func() {
 			JustBeforeEach(func() {
 				Eventually(bbs.GetAllDesiredLRPs).Should(HaveLen(1))
-				publishDesireWithInstances(0)
+				err := bbs.RemoveDesiredLRPByProcessGuid("the-guid")
+				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("should remove the desired state from etcd", func() {

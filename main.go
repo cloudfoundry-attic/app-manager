@@ -11,13 +11,11 @@ import (
 	"github.com/cloudfoundry/gunk/timeprovider"
 	"github.com/cloudfoundry/storeadapter/etcdstoreadapter"
 	"github.com/cloudfoundry/storeadapter/workerpool"
-	"github.com/cloudfoundry/yagnats"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
-	"github.com/cloudfoundry-incubator/app-manager/nsync"
 	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 )
 
@@ -67,7 +65,6 @@ func main() {
 	flag.Parse()
 
 	logger := initializeLogger()
-	natsClient := initializeNatsClient(logger)
 	bbs := initializeBbs(logger)
 
 	var circuseDownloadURLs map[string]string
@@ -80,7 +77,6 @@ func main() {
 
 	group := grouper.EnvokeGroup(grouper.RunGroup{
 		"handler": handler.NewHandler(bbs, startMessageBuilder, logger),
-		"nsync":   nsync.NewNsync(natsClient, bbs, logger),
 	})
 
 	logger.Info("app_manager.started")
@@ -111,28 +107,6 @@ func initializeLogger() *steno.Logger {
 	steno.Init(stenoConfig)
 
 	return steno.NewLogger("AppManager")
-}
-
-func initializeNatsClient(logger *steno.Logger) yagnats.NATSClient {
-	natsClient := yagnats.NewClient()
-
-	natsMembers := []yagnats.ConnectionProvider{}
-	for _, addr := range strings.Split(*natsAddresses, ",") {
-		natsMembers = append(
-			natsMembers,
-			&yagnats.ConnectionInfo{addr, *natsUsername, *natsPassword},
-		)
-	}
-
-	err := natsClient.Connect(&yagnats.ConnectionCluster{
-		Members: natsMembers,
-	})
-
-	if err != nil {
-		logger.Fatalf("Error connecting to NATS: %s\n", err)
-	}
-
-	return natsClient
 }
 
 func initializeBbs(logger *steno.Logger) Bbs.AppManagerBBS {
