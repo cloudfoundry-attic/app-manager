@@ -31,24 +31,6 @@ var etcdCluster = flag.String(
 	"comma-separated list of etcd addresses (http://ip:port)",
 )
 
-var natsAddresses = flag.String(
-	"natsAddresses",
-	"127.0.0.1:4222",
-	"comma-separated list of NATS addresses (ip:port)",
-)
-
-var natsUsername = flag.String(
-	"natsUsername",
-	"nats",
-	"Username to connect to nats",
-)
-
-var natsPassword = flag.String(
-	"natsPassword",
-	"nats",
-	"Password for nats user",
-)
-
 var syslogName = flag.String(
 	"syslogName",
 	"",
