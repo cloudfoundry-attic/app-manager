@@ -11,23 +11,23 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/delta_force/delta_force",
-			"Rev": "7499a2b3e62c1eaa21cb0020154f5679f3736714"
+			"Rev": "de3c425f8ad5e6897c70aaf7b21c1170731fb60e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/rep/routes",
-			"Rev": "ddc78e8d21c7f42593e912ea5cff2cf5ca083b0b"
+			"Rev": "7203382eaa0be88ff293d56f3c7ed5ea5c000b23"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/bbs",
-			"Rev": "9a7d5246fcf7a2c30480857a6853805e44531e04"
+			"Rev": "eb6db3bfb41bbd6795714a80ccd7302c0a21c86a"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/models",
-			"Rev": "9a7d5246fcf7a2c30480857a6853805e44531e04"
+			"Rev": "eb6db3bfb41bbd6795714a80ccd7302c0a21c86a"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/runtime-schema/router",
-			"Rev": "9a7d5246fcf7a2c30480857a6853805e44531e04"
+			"Rev": "eb6db3bfb41bbd6795714a80ccd7302c0a21c86a"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -65,8 +65,8 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.0.0-12-g8c58607",
-			"Rev": "8c586078cd1019084c081e889d007fba9c6f4198"
+			"Comment": "v1.0.0-16-g12446bb",
+			"Rev": "12446bbcc74950944c897e32ea99cc8d058f9c92"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",

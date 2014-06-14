@@ -143,7 +143,7 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 		h.logger.Infod(map[string]interface{}{
 			"desired-app-message": desiredLRP,
 			"stop-instance-guid":  guidToStop,
-		}, "handler.request-stop")
+		}, "handler.request-stop-instance")
 
 		actualToStop := instanceGuidToActual[guidToStop]
 
@@ -159,6 +159,25 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 				"stop-instance-guid":  guidToStop,
 				"error":               err.Error(),
 			}, "handler.request-stop-instance.failed")
+		}
+	}
+
+	for _, indexToStopAllButOne := range delta.IndicesToStopAllButOne {
+		h.logger.Infod(map[string]interface{}{
+			"desired-app-message":  desiredLRP,
+			"stop-duplicate-index": indexToStopAllButOne,
+		}, "handler.request-stop-auction")
+		err = h.bbs.RequestLRPStopAuction(models.LRPStopAuction{
+			ProcessGuid: desiredLRP.ProcessGuid,
+			Index:       indexToStopAllButOne,
+		})
+
+		if err != nil {
+			h.logger.Errord(map[string]interface{}{
+				"desired-app-message":  desiredLRP,
+				"stop-duplicate-index": indexToStopAllButOne,
+				"error":                err.Error(),
+			}, "handler.request-stop-auction.failed")
 		}
 	}
 }

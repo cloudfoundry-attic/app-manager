@@ -331,6 +331,96 @@ var _ = Describe("Handler", func() {
 				Ω(stopInstances).Should(ContainElement(stopInstance2))
 			})
 		})
+
+		Context("when there are duplicate desired instances running for the desired app", func() {
+			BeforeEach(func() {
+				desiredLRP.Instances = 3
+				bbs.Lock()
+				bbs.ActualLRPs = []models.ActualLRP{
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "a",
+						Index:        0,
+						State:        models.ActualLRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "b",
+						Index:        1,
+						State:        models.ActualLRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "c",
+						Index:        1,
+						State:        models.ActualLRPStateStarting,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "d",
+						Index:        2,
+						State:        models.ActualLRPStateRunning,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "e",
+						Index:        2,
+						State:        models.ActualLRPStateRunning,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "f",
+						Index:        3,
+						State:        models.ActualLRPStateRunning,
+					},
+					{
+						ProcessGuid:  "the-app-guid-the-app-version",
+						InstanceGuid: "g",
+						Index:        3,
+						State:        models.ActualLRPStateRunning,
+					},
+				}
+				bbs.Unlock()
+			})
+
+			It("doesn't start anything", func() {
+				Consistently(bbs.GetLRPStartAuctions).Should(BeEmpty())
+			})
+
+			It("holds stop auctions for the desired duplicates", func() {
+				Eventually(bbs.GetLRPStopAuctions).Should(HaveLen(2))
+				stopAuctions := bbs.GetLRPStopAuctions()
+
+				Ω(stopAuctions).Should(ContainElement(models.LRPStopAuction{
+					ProcessGuid: "the-app-guid-the-app-version",
+					Index:       1,
+				}))
+
+				Ω(stopAuctions).Should(ContainElement(models.LRPStopAuction{
+					ProcessGuid: "the-app-guid-the-app-version",
+					Index:       2,
+				}))
+			})
+
+			It("stops extra ones", func() {
+				Eventually(bbs.GetStopLRPInstances).Should(HaveLen(2))
+				stopInstances := bbs.GetStopLRPInstances()
+
+				stopInstance1 := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        3,
+					InstanceGuid: "f",
+				}
+				stopInstance2 := models.StopLRPInstance{
+					ProcessGuid:  "the-app-guid-the-app-version",
+					Index:        3,
+					InstanceGuid: "g",
+				}
+
+				Ω(stopInstances).Should(ContainElement(stopInstance1))
+				Ω(stopInstances).Should(ContainElement(stopInstance2))
+			})
+		})
 	})
 
 	Describe("when a desired LRP is deleted", func() {
