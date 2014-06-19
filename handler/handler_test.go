@@ -56,8 +56,8 @@ var _ = Describe("Handler", func() {
 			Stack:        "some-stack",
 			StartCommand: "the-start-command",
 			Environment: []models.EnvironmentVariable{
-				{Key: "foo", Value: "bar"},
-				{Key: "VCAP_APPLICATION", Value: "{\"application_name\":\"my-app\"}"},
+				{Name: "foo", Value: "bar"},
+				{Name: "VCAP_APPLICATION", Value: "{\"application_name\":\"my-app\"}"},
 			},
 			MemoryMB:        128,
 			DiskMB:          512,

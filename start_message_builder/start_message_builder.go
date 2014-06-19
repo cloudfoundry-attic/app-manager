@@ -176,14 +176,14 @@ func (b StartMessageBuilder) circusDownloadURL(stack string, fileServerURL strin
 }
 
 func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int) ([]models.EnvironmentVariable, error) {
-	env = append(env, models.EnvironmentVariable{Key: "PORT", Value: "8080"})
-	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_PORT", Value: "8080"})
-	env = append(env, models.EnvironmentVariable{Key: "VCAP_APP_HOST", Value: "0.0.0.0"})
+	env = append(env, models.EnvironmentVariable{Name: "PORT", Value: "8080"})
+	env = append(env, models.EnvironmentVariable{Name: "VCAP_APP_PORT", Value: "8080"})
+	env = append(env, models.EnvironmentVariable{Name: "VCAP_APP_HOST", Value: "0.0.0.0"})
 
 	vcapAppEnv := map[string]interface{}{}
 	vcapAppEnvIndex := -1
 	for i, envVar := range env {
-		if envVar.Key == "VCAP_APPLICATION" {
+		if envVar.Name == "VCAP_APPLICATION" {
 			vcapAppEnvIndex = i
 			err := json.Unmarshal([]byte(envVar.Value), &vcapAppEnv)
 			if err != nil {
@@ -206,6 +206,6 @@ func createLrpEnv(env []models.EnvironmentVariable, lrpGuid string, lrpIndex int
 		return env, err
 	}
 
-	env[vcapAppEnvIndex] = models.EnvironmentVariable{Key: "VCAP_APPLICATION", Value: string(lrpEnv)}
+	env[vcapAppEnvIndex] = models.EnvironmentVariable{Name: "VCAP_APPLICATION", Value: string(lrpEnv)}
 	return env, nil
 }

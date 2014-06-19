@@ -33,8 +33,8 @@ var _ = Describe("Start Message Builder", func() {
 			Stack:        "some-stack",
 			StartCommand: "the-start-command",
 			Environment: []models.EnvironmentVariable{
-				{Key: "foo", Value: "bar"},
-				{Key: "VCAP_APPLICATION", Value: "{\"application_name\":\"my-app\"}"},
+				{Name: "foo", Value: "bar"},
+				{Name: "VCAP_APPLICATION", Value: "{\"application_name\":\"my-app\"}"},
 			},
 			MemoryMB:        128,
 			DiskMB:          512,
@@ -109,28 +109,28 @@ var _ = Describe("Start Message Builder", func() {
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "foo",
+			Name:   "foo",
 			Value: "bar",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "PORT",
+			Name:   "PORT",
 			Value: "8080",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "VCAP_APP_PORT",
+			Name:   "VCAP_APP_PORT",
 			Value: "8080",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Key:   "VCAP_APP_HOST",
+			Name:   "VCAP_APP_HOST",
 			Value: "0.0.0.0",
 		}))
 
 		var vcapAppEnv string
 		for _, envVar := range runAction.Env {
-			if envVar.Key == "VCAP_APPLICATION" {
+			if envVar.Name == "VCAP_APPLICATION" {
 				vcapAppEnv = envVar.Value
 			}
 		}
