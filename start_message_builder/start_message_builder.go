@@ -12,7 +12,7 @@ import (
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/urljoiner"
 	"github.com/nu7hatch/gouuid"
-	"github.com/tedsuo/router"
+	"github.com/tedsuo/rata"
 )
 
 var ErrNoCircusDefined = errors.New("no lifecycle binary bundle defined for stack")
@@ -70,14 +70,14 @@ func (b *StartMessageBuilder) Build(desiredLRP models.DesiredLRP, lrpIndex int, 
 		numFiles = &desiredLRP.FileDescriptors
 	}
 
-	repRequests := router.NewRequestGenerator(
+	repRequests := rata.NewRequestGenerator(
 		"http://"+b.repAddrRelativeToExecutor,
 		RepRoutes.Routes,
 	)
 
-	healthyHook, err := repRequests.RequestForHandler(
+	healthyHook, err := repRequests.CreateRequest(
 		RepRoutes.LRPRunning,
-		router.Params{
+		rata.Params{
 			"process_guid":  lrpGuid,
 			"index":         fmt.Sprintf("%d", lrpIndex),
 			"instance_guid": instanceGuid.String(),
