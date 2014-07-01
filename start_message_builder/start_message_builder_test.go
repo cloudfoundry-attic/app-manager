@@ -91,7 +91,8 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(ok).Should(BeTrue())
 
 		Ω(monitorAction.Action.Action).Should(Equal(models.RunAction{
-			Script: "/tmp/circus/spy -addr=:8080",
+			Path: "/tmp/circus/spy",
+			Args: []string{"-addr=:8080"},
 		}))
 
 		Ω(monitorAction.HealthyHook).Should(Equal(models.HealthRequest{
@@ -102,29 +103,30 @@ var _ = Describe("Start Message Builder", func() {
 		Ω(monitorAction.HealthyThreshold).ShouldNot(BeZero())
 		Ω(monitorAction.UnhealthyThreshold).ShouldNot(BeZero())
 
-		Ω(runAction.Script).Should(Equal("/tmp/circus/soldier /app the-start-command"))
+		Ω(runAction.Path).Should(Equal("/tmp/circus/soldier"))
+		Ω(runAction.Args).Should(Equal([]string{"/app", "the-start-command"}))
 
 		Ω(runAction.ResourceLimits).Should(Equal(models.ResourceLimits{
 			Nofile: &numFiles,
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Name:   "foo",
+			Name:  "foo",
 			Value: "bar",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Name:   "PORT",
+			Name:  "PORT",
 			Value: "8080",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Name:   "VCAP_APP_PORT",
+			Name:  "VCAP_APP_PORT",
 			Value: "8080",
 		}))
 
 		Ω(runAction.Env).Should(ContainElement(models.EnvironmentVariable{
-			Name:   "VCAP_APP_HOST",
+			Name:  "VCAP_APP_HOST",
 			Value: "0.0.0.0",
 		}))
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
@@ -126,7 +127,8 @@ func (b *StartMessageBuilder) Build(desiredLRP models.DesiredLRP, lrpIndex int, 
 			models.Parallel(
 				models.ExecutorAction{
 					models.RunAction{
-						Script:  "/tmp/circus/soldier /app " + desiredLRP.StartCommand,
+						Path:    "/tmp/circus/soldier",
+						Args:    append([]string{"/app"}, strings.Split(desiredLRP.StartCommand, " ")...),
 						Env:     lrpEnv,
 						Timeout: 0,
 						ResourceLimits: models.ResourceLimits{
@@ -138,7 +140,8 @@ func (b *StartMessageBuilder) Build(desiredLRP models.DesiredLRP, lrpIndex int, 
 					models.MonitorAction{
 						Action: models.ExecutorAction{
 							models.RunAction{
-								Script: "/tmp/circus/spy -addr=:8080",
+								Path: "/tmp/circus/spy",
+								Args: []string{"-addr=:8080"},
 							},
 						},
 						HealthyThreshold:   1,
