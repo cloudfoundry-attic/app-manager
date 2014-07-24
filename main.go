@@ -8,10 +8,10 @@ import (
 
 	"github.com/cloudfoundry-incubator/cf-lager"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/timeprovider"
 	"github.com/cloudfoundry/storeadapter/etcdstoreadapter"
 	"github.com/cloudfoundry/storeadapter/workerpool"
+	"github.com/pivotal-golang/lager"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
@@ -32,12 +32,6 @@ var etcdCluster = flag.String(
 	"comma-separated list of etcd addresses (http://ip:port)",
 )
 
-var syslogName = flag.String(
-	"syslogName",
-	"",
-	"syslog name",
-)
-
 var circuses = flag.String(
 	"circuses",
 	"",
@@ -48,8 +42,8 @@ func main() {
 	flag.Parse()
 
 	logger := cf_lager.New("app-manager")
-	stenoLogger := initializeStenoLogger()
-	bbs := initializeBbs(stenoLogger)
+
+	bbs := initializeBbs(logger)
 
 	var circuseDownloadURLs map[string]string
 	err := json.Unmarshal([]byte(*circuses), &circuseDownloadURLs)
@@ -76,23 +70,7 @@ func main() {
 	logger.Info("exited")
 }
 
-func initializeStenoLogger() *steno.Logger {
-	stenoConfig := &steno.Config{
-		Sinks: []steno.Sink{
-			steno.NewIOSink(os.Stdout),
-		},
-	}
-
-	if *syslogName != "" {
-		stenoConfig.Sinks = append(stenoConfig.Sinks, steno.NewSyslogSink(*syslogName))
-	}
-
-	steno.Init(stenoConfig)
-
-	return steno.NewLogger("AppManager")
-}
-
-func initializeBbs(logger *steno.Logger) Bbs.AppManagerBBS {
+func initializeBbs(logger lager.Logger) Bbs.AppManagerBBS {
 	etcdAdapter := etcdstoreadapter.NewETCDStoreAdapter(
 		strings.Split(*etcdCluster, ","),
 		workerpool.NewWorkerPool(10),
@@ -100,7 +78,7 @@ func initializeBbs(logger *steno.Logger) Bbs.AppManagerBBS {
 
 	err := etcdAdapter.Connect()
 	if err != nil {
-		logger.Fatalf("Error connecting to etcd: %s\n", err)
+		logger.Fatal("failed-to-connect-to-etcd", err)
 	}
 
 	return Bbs.NewAppManagerBBS(etcdAdapter, timeprovider.NewTimeProvider(), logger)
