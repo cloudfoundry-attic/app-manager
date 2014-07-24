@@ -38,7 +38,7 @@ func New(
 
 func (r *AppManagerRunner) Start() {
 	r.StartWithoutCheck()
-	Eventually(r.Session, 5*time.Second).Should(gbytes.Say("app_manager.started"))
+	Eventually(r.Session, 5*time.Second).Should(gbytes.Say("app-manager.started"))
 }
 
 func (r *AppManagerRunner) StartWithoutCheck() {

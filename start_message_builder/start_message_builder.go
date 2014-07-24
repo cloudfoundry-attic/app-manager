@@ -10,9 +10,9 @@ import (
 	RepRoutes "github.com/cloudfoundry-incubator/rep/routes"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	SchemaRouter "github.com/cloudfoundry-incubator/runtime-schema/router"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/urljoiner"
 	"github.com/nu7hatch/gouuid"
+	"github.com/pivotal-golang/lager"
 	"github.com/tedsuo/rata"
 )
 
@@ -20,11 +20,11 @@ var ErrNoCircusDefined = errors.New("no lifecycle binary bundle defined for stac
 
 type StartMessageBuilder struct {
 	repAddrRelativeToExecutor string
-	logger                    *steno.Logger
+	logger                    lager.Logger
 	circuses                  map[string]string
 }
 
-func New(repAddrRelativeToExecutor string, circuses map[string]string, logger *steno.Logger) *StartMessageBuilder {
+func New(repAddrRelativeToExecutor string, circuses map[string]string, logger lager.Logger) *StartMessageBuilder {
 	return &StartMessageBuilder{
 		repAddrRelativeToExecutor: repAddrRelativeToExecutor,
 		circuses:                  circuses,
@@ -35,34 +35,26 @@ func New(repAddrRelativeToExecutor string, circuses map[string]string, logger *s
 func (b *StartMessageBuilder) Build(desiredLRP models.DesiredLRP, lrpIndex int, fileServerURL string) (models.LRPStartAuction, error) {
 	lrpGuid := desiredLRP.ProcessGuid
 
+	buildLogger := b.logger.Session("message-builder")
+
 	instanceGuid, err := uuid.NewV4()
 	if err != nil {
-		b.logger.Errorf("Error generating instance guid: %s", err.Error())
+		buildLogger.Error("generating-instance-guid-failed", err)
 		return models.LRPStartAuction{}, err
 	}
 
 	circusURL, err := b.circusDownloadURL(desiredLRP.Stack, fileServerURL)
 	if err != nil {
-		b.logger.Warnd(
-			map[string]interface{}{
-				"error": err.Error(),
-				"stack": desiredLRP.Stack,
-			},
-			"handler.construct-circus-download-url.failed",
-		)
+		buildLogger.Error("construct-circus-download-url-failed", err, lager.Data{
+			"stack": desiredLRP.Stack,
+		})
 
 		return models.LRPStartAuction{}, err
 	}
 
 	lrpEnv, err := createLrpEnv(desiredLRP.Environment, lrpGuid, lrpIndex)
 	if err != nil {
-		b.logger.Warnd(
-			map[string]interface{}{
-				"error": err.Error(),
-			},
-			"handler.constructing-env.failed",
-		)
-
+		buildLogger.Error("constructing-env-failed", err)
 		return models.LRPStartAuction{}, err
 	}
 

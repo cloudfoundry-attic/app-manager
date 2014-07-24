@@ -9,7 +9,7 @@ import (
 	"github.com/cloudfoundry-incubator/delta_force/delta_force"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
-	steno "github.com/cloudfoundry/gosteno"
+	"github.com/pivotal-golang/lager"
 )
 
 var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
@@ -17,18 +17,19 @@ var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
 type Handler struct {
 	bbs                 Bbs.AppManagerBBS
 	startMessageBuilder *start_message_builder.StartMessageBuilder
-	logger              *steno.Logger
+	logger              lager.Logger
 }
 
 func NewHandler(
 	bbs Bbs.AppManagerBBS,
 	startMessageBuilder *start_message_builder.StartMessageBuilder,
-	logger *steno.Logger,
+	logger lager.Logger,
 ) Handler {
+	handlerLogger := logger.Session("handler")
 	return Handler{
 		bbs:                 bbs,
 		startMessageBuilder: startMessageBuilder,
-		logger:              logger,
+		logger:              handlerLogger,
 	}
 }
 
@@ -51,23 +52,21 @@ func (h Handler) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 					h.processDesiredChange(desiredChange)
 				}()
 			} else {
-				h.logger.Error("app-manager.handler.watch-closed")
+				h.logger.Error("watch-closed", nil)
 				desiredChangeChan = nil
 			}
 
 		case err, ok := <-errChan:
 			if ok {
-				h.logger.Errord(map[string]interface{}{
-					"error": err.Error(),
-				}, "app-manager.handler.received-watch-error")
+				h.logger.Error("watch-error", err)
 			}
 			desiredChangeChan = nil
 
 		case <-signals:
-			h.logger.Info("app-manager.handler.shutting-down")
+			h.logger.Info("shutting-down")
 			close(stopChan)
 			wg.Wait()
-			h.logger.Info("app-manager.handler.shut-down")
+			h.logger.Info("shut-down")
 			return nil
 		}
 	}
@@ -79,6 +78,8 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 	var desiredLRP models.DesiredLRP
 	var desiredInstances int
 
+	changeLogger := h.logger.Session("desired-lrp-change")
+
 	if desiredChange.After == nil {
 		desiredLRP = *desiredChange.Before
 		desiredInstances = 0
@@ -89,61 +90,51 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 
 	fileServerURL, err := h.bbs.GetAvailableFileServer()
 	if err != nil {
-		h.logger.Warnd(
-			map[string]interface{}{
-				"desired-app-message": desiredLRP,
-				"error":               err.Error(),
-			},
-			"handler.get-available-file-server.failed",
-		)
-
+		changeLogger.Error("get-available-file-server-failed", err, lager.Data{"desired-app-message": desiredLRP})
 		return
 	}
 
 	actualInstances, instanceGuidToActual, err := h.actualsForProcessGuid(desiredLRP.ProcessGuid)
 	if err != nil {
-		h.logger.Errord(map[string]interface{}{
-			"desired-app-message": desiredLRP,
-			"error":               err.Error(),
-		}, "handler.fetch-actuals.failed")
+		changeLogger.Error("fetch-actuals-failed", err, lager.Data{"desired-app-message": desiredLRP})
 		return
 	}
 
 	delta := delta_force.Reconcile(desiredInstances, actualInstances)
 
 	for _, lrpIndex := range delta.IndicesToStart {
-		h.logger.Infod(map[string]interface{}{
+		changeLogger.Info("request-start", lager.Data{
 			"desired-app-message": desiredLRP,
 			"index":               lrpIndex,
-		}, "handler.request-start")
+		})
 
 		startMessage, err := h.startMessageBuilder.Build(desiredLRP, lrpIndex, fileServerURL)
 
 		if err != nil {
-			h.logger.Errord(map[string]interface{}{
+			changeLogger.Error("build-start-message-failed", err, lager.Data{
 				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
-				"error":               err.Error(),
-			}, "handler.build-start-message.failed")
+			})
+
 			continue
 		}
 
 		err = h.bbs.RequestLRPStartAuction(startMessage)
 
 		if err != nil {
-			h.logger.Errord(map[string]interface{}{
+			changeLogger.Error("request-start-auction-failed", err, lager.Data{
 				"desired-app-message": desiredLRP,
 				"index":               lrpIndex,
-				"error":               err.Error(),
-			}, "handler.request-start-auction.failed")
+			})
+
 		}
 	}
 
 	for _, guidToStop := range delta.GuidsToStop {
-		h.logger.Infod(map[string]interface{}{
+		changeLogger.Info("request-stop-instance", lager.Data{
 			"desired-app-message": desiredLRP,
 			"stop-instance-guid":  guidToStop,
-		}, "handler.request-stop-instance")
+		})
 
 		actualToStop := instanceGuidToActual[guidToStop]
 
@@ -154,30 +145,28 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 		})
 
 		if err != nil {
-			h.logger.Errord(map[string]interface{}{
+			changeLogger.Error("request-stop-instance-failed", err, lager.Data{
 				"desired-app-message": desiredLRP,
 				"stop-instance-guid":  guidToStop,
-				"error":               err.Error(),
-			}, "handler.request-stop-instance.failed")
+			})
 		}
 	}
 
 	for _, indexToStopAllButOne := range delta.IndicesToStopAllButOne {
-		h.logger.Infod(map[string]interface{}{
+		changeLogger.Info("request-stop-auction", lager.Data{
 			"desired-app-message":  desiredLRP,
 			"stop-duplicate-index": indexToStopAllButOne,
-		}, "handler.request-stop-auction")
+		})
 		err = h.bbs.RequestLRPStopAuction(models.LRPStopAuction{
 			ProcessGuid: desiredLRP.ProcessGuid,
 			Index:       indexToStopAllButOne,
 		})
 
 		if err != nil {
-			h.logger.Errord(map[string]interface{}{
+			changeLogger.Error("request-stop-auction-failed", err, lager.Data{
 				"desired-app-message":  desiredLRP,
 				"stop-duplicate-index": indexToStopAllButOne,
-				"error":                err.Error(),
-			}, "handler.request-stop-auction.failed")
+			})
 		}
 	}
 }

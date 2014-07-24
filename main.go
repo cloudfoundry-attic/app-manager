@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cloudfoundry-incubator/cf-lager"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/timeprovider"
@@ -46,13 +47,14 @@ var circuses = flag.String(
 func main() {
 	flag.Parse()
 
-	logger := initializeLogger()
-	bbs := initializeBbs(logger)
+	logger := cf_lager.New("app-manager")
+	stenoLogger := initializeStenoLogger()
+	bbs := initializeBbs(stenoLogger)
 
 	var circuseDownloadURLs map[string]string
 	err := json.Unmarshal([]byte(*circuses), &circuseDownloadURLs)
 	if err != nil {
-		logger.Fatalf("invalid health checks: %s\n", err)
+		logger.Fatal("invalid-health-checks", err)
 	}
 
 	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, circuseDownloadURLs, logger)
@@ -61,21 +63,20 @@ func main() {
 		"handler": handler.NewHandler(bbs, startMessageBuilder, logger),
 	})
 
-	logger.Info("app_manager.started")
+	logger.Info("started")
 
 	monitor := ifrit.Envoke(sigmon.New(group))
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Errord(map[string]interface{}{
-			"error": err.Error(),
-		}, "app_manager.exited")
+		logger.Error("exited", err)
 		os.Exit(1)
 	}
-	logger.Info("app_manager.exited")
+
+	logger.Info("exited")
 }
 
-func initializeLogger() *steno.Logger {
+func initializeStenoLogger() *steno.Logger {
 	stenoConfig := &steno.Config{
 		Sinks: []steno.Sink{
 			steno.NewIOSink(os.Stdout),

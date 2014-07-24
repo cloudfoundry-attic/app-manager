@@ -8,19 +8,20 @@ import (
 	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 	"github.com/cloudfoundry-incubator/runtime-schema/bbs/fake_bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/storeadapter"
+	"github.com/pivotal-golang/lager"
 	"github.com/tedsuo/ifrit"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Handler", func() {
 	var (
 		startMessageBuilder       *start_message_builder.StartMessageBuilder
 		bbs                       *fake_bbs.FakeAppManagerBBS
-		logSink                   *steno.TestingSink
+		logOutput                 *gbytes.Buffer
 		desiredLRP                models.DesiredLRP
 		repAddrRelativeToExecutor string
 		healthChecks              map[string]string
@@ -29,14 +30,9 @@ var _ = Describe("Handler", func() {
 	)
 
 	BeforeEach(func() {
-		logSink = steno.NewTestingSink()
-
-		steno.Init(&steno.Config{
-			Sinks: []steno.Sink{logSink},
-		})
-
-		logger := steno.NewLogger("the-logger")
-		steno.EnterTestMode()
+		logOutput = gbytes.NewBuffer()
+		logger := lager.NewLogger("fakelogger")
+		logger.RegisterSink(lager.NewWriterSink(logOutput, lager.INFO))
 
 		bbs = fake_bbs.NewFakeAppManagerBBS()
 
@@ -219,8 +215,7 @@ var _ = Describe("Handler", func() {
 			})
 
 			It("logs an error", func() {
-				Eventually(logSink.Records).Should(HaveLen(4))
-				Ω(logSink.Records()[1].Message).Should(ContainSubstring("handler.request-start-auction.failed"))
+				Eventually(logOutput).Should(gbytes.Say("handler.desired-lrp-change.request-start-auction-failed"))
 			})
 		})
 

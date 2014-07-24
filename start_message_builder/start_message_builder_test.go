@@ -2,10 +2,11 @@ package start_message_builder_test
 
 import (
 	"fmt"
+
 	. "github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
+	"github.com/pivotal-golang/lager"
 
-	steno "github.com/cloudfoundry/gosteno"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -22,7 +23,7 @@ var _ = Describe("Start Message Builder", func() {
 	BeforeEach(func() {
 		fileServerURL = "http://file-server.com"
 		repAddrRelativeToExecutor = "127.0.0.1:20515"
-		logger := steno.NewLogger("the-logger")
+		logger := lager.NewLogger("fakelogger")
 		circuses = map[string]string{
 			"some-stack": "some-circus.tgz",
 		}
