@@ -56,7 +56,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "196990d547253e2c2d14e188464ccd69b526e35d"
+			"Rev": "8e98f972ab3eabfb6d44065cd0b30f170d3db794"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -82,7 +82,7 @@
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",
-			"Rev": "79ecfbe018f60a70d5a687d7aa1eecc2351be91f"
+			"Rev": "435f9e78ed02262ec0d1e13a82b5a475c990714a"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/rata",
