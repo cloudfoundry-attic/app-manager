@@ -9,7 +9,7 @@ import (
 	"github.com/cloudfoundry-incubator/runtime-schema/bbs/fake_bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	"github.com/cloudfoundry/storeadapter"
-	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 	"github.com/tedsuo/ifrit"
 
 	. "github.com/onsi/ginkgo"
@@ -21,7 +21,7 @@ var _ = Describe("Handler", func() {
 	var (
 		startMessageBuilder       *start_message_builder.StartMessageBuilder
 		bbs                       *fake_bbs.FakeAppManagerBBS
-		logOutput                 *gbytes.Buffer
+		logger                    *lagertest.TestLogger
 		desiredLRP                models.DesiredLRP
 		repAddrRelativeToExecutor string
 		healthChecks              map[string]string
@@ -30,10 +30,6 @@ var _ = Describe("Handler", func() {
 	)
 
 	BeforeEach(func() {
-		logOutput = gbytes.NewBuffer()
-		logger := lager.NewLogger("fakelogger")
-		logger.RegisterSink(lager.NewWriterSink(logOutput, lager.INFO))
-
 		bbs = fake_bbs.NewFakeAppManagerBBS()
 
 		repAddrRelativeToExecutor = "127.0.0.1:20515"
@@ -41,6 +37,8 @@ var _ = Describe("Handler", func() {
 		healthChecks = map[string]string{
 			"some-stack": "some-health-check.tgz",
 		}
+
+		logger = lagertest.NewTestLogger("test")
 
 		startMessageBuilder = start_message_builder.New(repAddrRelativeToExecutor, healthChecks, logger)
 
@@ -215,7 +213,7 @@ var _ = Describe("Handler", func() {
 			})
 
 			It("logs an error", func() {
-				Eventually(logOutput).Should(gbytes.Say("handler.desired-lrp-change.request-start-auction-failed"))
+				Eventually(logger.TestSink.Buffer).Should(gbytes.Say("handler.desired-lrp-change.request-start-auction-failed"))
 			})
 		})
 
