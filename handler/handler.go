@@ -5,31 +5,35 @@ import (
 	"os"
 	"sync"
 
-	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
 	"github.com/cloudfoundry-incubator/delta_force/delta_force"
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
+	"github.com/nu7hatch/gouuid"
 	"github.com/pivotal-golang/lager"
 )
 
 var ErrNoHealthCheckDefined = errors.New("no health check defined for stack")
 
+type LRPreProcessor interface {
+	PreProcess(lrp models.DesiredLRP, instanceIndex int, instanceGuid string) (models.DesiredLRP, error)
+}
+
 type Handler struct {
-	bbs                 Bbs.AppManagerBBS
-	startMessageBuilder *start_message_builder.StartMessageBuilder
-	logger              lager.Logger
+	bbs            Bbs.AppManagerBBS
+	lrPreProcessor LRPreProcessor
+	logger         lager.Logger
 }
 
 func NewHandler(
 	bbs Bbs.AppManagerBBS,
-	startMessageBuilder *start_message_builder.StartMessageBuilder,
+	lrPreProcessor LRPreProcessor,
 	logger lager.Logger,
 ) Handler {
 	handlerLogger := logger.Session("handler")
 	return Handler{
-		bbs:                 bbs,
-		startMessageBuilder: startMessageBuilder,
-		logger:              handlerLogger,
+		bbs:            bbs,
+		lrPreProcessor: lrPreProcessor,
+		logger:         handlerLogger,
 	}
 }
 
@@ -43,6 +47,7 @@ func (h Handler) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		if desiredChangeChan == nil {
 			desiredChangeChan, stopChan, errChan = h.bbs.WatchForDesiredLRPChanges()
 		}
+
 		select {
 		case desiredChange, ok := <-desiredChangeChan:
 			if ok {
@@ -88,12 +93,6 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 		desiredInstances = desiredLRP.Instances
 	}
 
-	fileServerURL, err := h.bbs.GetAvailableFileServer()
-	if err != nil {
-		changeLogger.Error("get-available-file-server-failed", err, lager.Data{"desired-app-message": desiredLRP})
-		return
-	}
-
 	actualInstances, instanceGuidToActual, err := h.actualsForProcessGuid(desiredLRP.ProcessGuid)
 	if err != nil {
 		changeLogger.Error("fetch-actuals-failed", err, lager.Data{"desired-app-message": desiredLRP})
@@ -108,15 +107,23 @@ func (h Handler) processDesiredChange(desiredChange models.DesiredLRPChange) {
 			"index":               lrpIndex,
 		})
 
-		startMessage, err := h.startMessageBuilder.Build(desiredLRP, lrpIndex, fileServerURL)
-
+		instanceGuid, err := uuid.NewV4()
 		if err != nil {
-			changeLogger.Error("build-start-message-failed", err, lager.Data{
-				"desired-app-message": desiredLRP,
-				"index":               lrpIndex,
-			})
+			changeLogger.Error("generating-instance-guid-failed", err)
+			return
+		}
 
-			continue
+		preprocessedLRP, err := h.lrPreProcessor.PreProcess(desiredLRP, lrpIndex, instanceGuid.String())
+		if err != nil {
+			changeLogger.Error("failed-to-preprocess-lrp", err)
+			return
+		}
+
+		startMessage := models.LRPStartAuction{
+			DesiredLRP: preprocessedLRP,
+
+			Index:        lrpIndex,
+			InstanceGuid: instanceGuid.String(),
 		}
 
 		err = h.bbs.RequestLRPStartAuction(startMessage)

@@ -17,7 +17,7 @@ import (
 	"github.com/tedsuo/ifrit/sigmon"
 
 	"github.com/cloudfoundry-incubator/app-manager/handler"
-	"github.com/cloudfoundry-incubator/app-manager/start_message_builder"
+	"github.com/cloudfoundry-incubator/app-manager/lrpreprocessor"
 )
 
 var repAddrRelativeToExecutor = flag.String(
@@ -51,10 +51,10 @@ func main() {
 		logger.Fatal("invalid-health-checks", err)
 	}
 
-	startMessageBuilder := start_message_builder.New(*repAddrRelativeToExecutor, circuseDownloadURLs, logger)
+	lrpp := lrpreprocessor.New(bbs)
 
 	group := grouper.EnvokeGroup(grouper.RunGroup{
-		"handler": handler.NewHandler(bbs, startMessageBuilder, logger),
+		"handler": handler.NewHandler(bbs, lrpp, logger),
 	})
 
 	logger.Info("started")

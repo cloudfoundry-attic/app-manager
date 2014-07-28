@@ -10,7 +10,6 @@ import (
 	Bbs "github.com/cloudfoundry-incubator/runtime-schema/bbs"
 	"github.com/cloudfoundry-incubator/runtime-schema/models"
 	"github.com/cloudfoundry/gunk/timeprovider"
-	"github.com/cloudfoundry/yagnats"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,13 +17,10 @@ import (
 
 var _ = Describe("Starting apps", func() {
 	var (
-		natsClient yagnats.NATSClient
-		bbs        *Bbs.BBS
+		bbs *Bbs.BBS
 	)
 
 	BeforeEach(func() {
-		natsClient = natsRunner.MessageBus
-
 		bbs = Bbs.NewBBS(etcdRunner.Adapter(), timeprovider.NewTimeProvider(), lagertest.NewTestLogger("test"))
 
 		var err error
@@ -52,20 +48,24 @@ var _ = Describe("Starting apps", func() {
 		fileServerPresence.Remove()
 	})
 
-	Describe("when a 'diego.desire.app' message is recieved", func() {
+	Describe("when an LRP is desired", func() {
 		JustBeforeEach(func() {
 			err := bbs.DesireLRP(models.DesiredLRP{
-				ProcessGuid:     "the-guid",
-				Source:          "http://the-droplet.uri.com",
-				FileDescriptors: 32,
-				Environment:     nil,
-				StartCommand:    "the-start-command",
-				Instances:       3,
-				MemoryMB:        128,
-				DiskMB:          512,
-				Stack:           "some-stack",
-				Routes:          nil,
-				LogGuid:         "the-log-guid",
+				ProcessGuid: "the-guid",
+
+				Stack: "some-stack",
+
+				Instances: 3,
+				MemoryMB:  128,
+				DiskMB:    512,
+
+				Actions: []models.ExecutorAction{
+					{
+						Action: models.RunAction{
+							Path: "the-start-command",
+						},
+					},
+				},
 			})
 			Ω(err).ShouldNot(HaveOccurred())
 		})
