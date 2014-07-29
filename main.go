@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"os"
 	"strings"
@@ -32,24 +31,12 @@ var etcdCluster = flag.String(
 	"comma-separated list of etcd addresses (http://ip:port)",
 )
 
-var circuses = flag.String(
-	"circuses",
-	"",
-	"app lifecycle binary bundle mapping (stack => bundle filename in fileserver)",
-)
-
 func main() {
 	flag.Parse()
 
 	logger := cf_lager.New("app-manager")
 
 	bbs := initializeBbs(logger)
-
-	var circuseDownloadURLs map[string]string
-	err := json.Unmarshal([]byte(*circuses), &circuseDownloadURLs)
-	if err != nil {
-		logger.Fatal("invalid-health-checks", err)
-	}
 
 	lrpp := lrpreprocessor.New(bbs)
 
@@ -61,9 +48,9 @@ func main() {
 
 	monitor := ifrit.Envoke(sigmon.New(group))
 
-	err = <-monitor.Wait()
+	err := <-monitor.Wait()
 	if err != nil {
-		logger.Error("exited", err)
+		logger.Error("exited-with-failure", err)
 		os.Exit(1)
 	}
 

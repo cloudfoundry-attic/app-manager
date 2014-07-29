@@ -39,7 +39,7 @@ var _ = Describe("LRPreProcessor", func() {
 				{
 					Action: models.DownloadAction{
 						From:    "PLACEHOLDER_FILESERVER_URL/some-download/path",
-						To:      "/tmp/circus",
+						To:      "/tmp/some-download",
 						Extract: true,
 					},
 				},
@@ -53,8 +53,8 @@ var _ = Describe("LRPreProcessor", func() {
 						models.MonitorAction{
 							Action: models.ExecutorAction{
 								models.RunAction{
-									Path: "/tmp/circus/spy",
-									Args: []string{"-addr=:8080"},
+									Path: "ls",
+									Args: []string{"-al"},
 								},
 							},
 							HealthyThreshold:   1,
@@ -87,7 +87,7 @@ var _ = Describe("LRPreProcessor", func() {
 				{
 					Action: models.DownloadAction{
 						From:    "http://some-fake-file-server/some-download/path",
-						To:      "/tmp/circus",
+						To:      "/tmp/some-download",
 						Extract: true,
 					},
 				},
@@ -101,8 +101,8 @@ var _ = Describe("LRPreProcessor", func() {
 						models.MonitorAction{
 							Action: models.ExecutorAction{
 								models.RunAction{
-									Path: "/tmp/circus/spy",
-									Args: []string{"-addr=:8080"},
+									Path: "ls",
+									Args: []string{"-al"},
 								},
 							},
 							HealthyThreshold:   1,
