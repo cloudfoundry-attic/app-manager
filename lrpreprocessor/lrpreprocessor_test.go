@@ -55,10 +55,6 @@ var _ = Describe("LRPreProcessor", func() {
 								models.RunAction{
 									Path: "ls",
 									Args: []string{"-al"},
-									Env: []models.EnvironmentVariable{
-										{Name: "VCAP_APPLICATION", Value: `{"foo":"1","bar":"PLACEHOLDER_INSTANCE_INDEX","baz":"PLACEHOLDER_INSTANCE_GUID"}`},
-										{Name: "SOME_OTHER_ENV", Value: "SOME_OTHER_VALUE"},
-									},
 								},
 							},
 							HealthyThreshold:   1,
@@ -107,10 +103,6 @@ var _ = Describe("LRPreProcessor", func() {
 								models.RunAction{
 									Path: "ls",
 									Args: []string{"-al"},
-									Env: []models.EnvironmentVariable{
-										{Name: "VCAP_APPLICATION", Value: `{"foo":"1","bar":2,"baz":"some-instance-guid"}`},
-										{Name: "SOME_OTHER_ENV", Value: "SOME_OTHER_VALUE"},
-									},
 								},
 							},
 							HealthyThreshold:   1,

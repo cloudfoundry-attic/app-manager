@@ -66,23 +66,6 @@ func walk(
 
 		action.Action = v
 
-	case models.RunAction:
-		if len(v.Env) == 0 {
-			break
-		}
-
-		newEnv := make([]models.EnvironmentVariable, len(v.Env))
-		for i, e := range v.Env {
-			env := e
-			env.Value = strings.Replace(env.Value, `"`+INSTANCE_INDEX_PLACEHOLDER_NAME+`"`, strconv.Itoa(index), -1)
-			env.Value = strings.Replace(env.Value, INSTANCE_GUID_PLACEHOLDER_NAME, guid, -1)
-			newEnv[i] = env
-		}
-
-		v.Env = newEnv
-
-		action.Action = v
-
 	case models.EmitProgressAction:
 		v.Action = walk(v.Action, fileserverURL, index, guid)
 		action.Action = v
