@@ -33,11 +33,7 @@ var _ = Describe("Starting apps", func() {
 
 		test_helpers.NewStatusReporter(presenceStatus)
 
-		runner = app_manager_runner.New(
-			appManagerPath,
-			etcdRunner.NodeURLS(),
-			"127.0.0.1:20515",
-		)
+		runner = app_manager_runner.New(appManagerPath, etcdRunner.NodeURLS())
 
 		runner.Start()
 	})

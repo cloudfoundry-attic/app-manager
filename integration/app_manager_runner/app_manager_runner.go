@@ -15,20 +15,12 @@ type AppManagerRunner struct {
 	appManagerBin string
 	etcdCluster   []string
 	Session       *gexec.Session
-
-	repAddrRelativeToExecutor string
 }
 
-func New(
-	appManagerBin string,
-	etcdCluster []string,
-	repAddrRelativeToExecutor string,
-) *AppManagerRunner {
+func New(appManagerBin string, etcdCluster []string) *AppManagerRunner {
 	return &AppManagerRunner{
 		appManagerBin: appManagerBin,
 		etcdCluster:   etcdCluster,
-
-		repAddrRelativeToExecutor: repAddrRelativeToExecutor,
 	}
 }
 
@@ -42,7 +34,6 @@ func (r *AppManagerRunner) StartWithoutCheck() {
 		exec.Command(
 			r.appManagerBin,
 			"-etcdCluster", strings.Join(r.etcdCluster, ","),
-			"-repAddrRelativeToExecutor", r.repAddrRelativeToExecutor,
 		),
 		gexec.NewPrefixedWriter("\x1b[32m[o]\x1b[35m[app-manager]\x1b[0m ", ginkgo.GinkgoWriter),
 		gexec.NewPrefixedWriter("\x1b[91m[e]\x1b[35m[app-manager]\x1b[0m ", ginkgo.GinkgoWriter),

@@ -19,12 +19,6 @@ import (
 	"github.com/cloudfoundry-incubator/app-manager/lrpreprocessor"
 )
 
-var repAddrRelativeToExecutor = flag.String(
-	"repAddrRelativeToExecutor",
-	"127.0.0.1:20515",
-	"address of the rep server that should receive health status updates",
-)
-
 var etcdCluster = flag.String(
 	"etcdCluster",
 	"http://127.0.0.1:4001",
