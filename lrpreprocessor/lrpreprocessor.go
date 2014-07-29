@@ -48,7 +48,7 @@ func walk(
 ) models.ExecutorAction {
 	switch v := action.Action.(type) {
 	case models.DownloadAction:
-		v.From = strings.Replace(v.From, FILESERVER_URL_PLACEHOLDER_NAME, fileserverURL, -1)
+		v.From = strings.Replace(v.From, FILESERVER_URL_PLACEHOLDER_NAME+"/", fileserverURL, -1)
 		action.Action = v
 
 	case models.TryAction:
